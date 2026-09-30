@@ -1,4 +1,5 @@
-// Every frontend setting in one place, read from Vite env variables (see .env.example).
+// Every frontend setting in one place, read from frontend/.env (optional)
+// or, on Render, the site's environment variables. Every value has a default.
 const env = import.meta.env
 
 export const appConfig = Object.freeze({

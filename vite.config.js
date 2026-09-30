@@ -2,7 +2,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-// Settings come from .env files (see .env.example). The fallbacks match the backend defaults.
+// Settings come from frontend/.env (optional; names in src/config/env.js). The fallbacks match the backend defaults.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 

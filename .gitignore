@@ -1,7 +1,6 @@
-# Settings: only the example goes to git
+# Settings never go to git
 .env
 .env.*
-!.env.example
 
 # Node / build
 node_modules/

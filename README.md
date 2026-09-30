@@ -38,7 +38,7 @@ npm run test:e2e
 
 ## Settings
 
-One optional file: copy `.env.example` to `.env` to change the title, API address, dev port,
+One optional file, `frontend/.env`, to change the title, API address, dev port,
 date locale, notification time or dark mode. Builder rules (reserved names, limits, dropdown
 sources) are not set here; they come from the backend at `GET /v1/meta/builder`.
 
