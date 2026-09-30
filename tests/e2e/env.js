@@ -18,8 +18,10 @@ export const UI_URL = `http://localhost:${UI_PORT}`
 export const PYTHON = process.env.E2E_PYTHON ||
   (process.platform === 'win32' ? '.venv\\Scripts\\python.exe' : '.venv/bin/python')
 
+// The backend reads backend/.env for the database connection. The values below are
+// forced on top (environment variables beat the file), so the tests stay isolated:
+// own port, test-only schemas (e2e_*), no rate limits getting in the way.
 export const BACKEND_TEST_ENV = {
-  APP_ENV: 'test',
   CONFIG_SCHEMA: 'e2e_config',
   TENANT_SCHEMA_PREFIX: 'e2e_t_',
   API_HOST: '127.0.0.1',
@@ -27,7 +29,7 @@ export const BACKEND_TEST_ENV = {
   API_DEBUG: 'false',
   LOG_DIR: 'logs/e2e',
   CORS_ORIGINS: UI_URL,
-  // Tests submit many times in a row; the limiter itself is covered by backend tests.
+  FRONTEND_DIST_DIR: '',
   PUBLIC_SUBMIT_LIMIT_PER_MINUTE: '1000',
   PUBLIC_VIEW_LIMIT_PER_MINUTE: '1000'
 }

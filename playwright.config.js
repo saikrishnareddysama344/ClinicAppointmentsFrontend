@@ -24,10 +24,12 @@ const servers = [
 if (!process.env.E2E_SKIP_UI_SERVER) {
   servers.push({
     name: 'UI',
+    // Same frontend as npm run dev, on its own port, talking to the test API.
     command: `npm run dev -- --port ${UI_PORT} --strictPort`,
     cwd: FRONTEND_DIR,
     url: UI_URL,
-    env: { ...process.env, VITE_API_PROXY_TARGET: API_URL },
+    // Blank API addresses so a Render URL in frontend/.env is never used by the tests.
+    env: { ...process.env, VITE_API_PROXY_TARGET: API_URL, VITE_API_BASE_URL: '', VITE_PUBLIC_BASE_URL: '' },
     reuseExistingServer: false,
     timeout: 120_000
   })

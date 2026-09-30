@@ -4,6 +4,8 @@ import { expect, test } from '@playwright/test'
 import { linkName, unique } from '../helpers.js'
 
 const toast = (page, text) => page.locator('.p-toast-message').filter({ hasText: text })
+// The form's status tag.
+const statusTag = (page) => page.locator('.page-head .p-tag')
 
 async function addField(page, typeName, label, { mandatory = false } = {}) {
   await page.getByRole('button', { name: 'Add field' }).click()
@@ -35,7 +37,7 @@ test('admin builds and publishes a form, a patient submits it, admin sees the re
   await expect(page.getByLabel('Link name')).toHaveValue(formSlug)
   await page.getByRole('button', { name: 'Create and open builder' }).click()
   await expect(page).toHaveURL(new RegExp(`/tenants/${tenantCode}/forms/${formSlug}$`))
-  await expect(page.locator('.p-tag')).toHaveText('Draft')
+  await expect(statusTag(page)).toHaveText('Draft')
 
   // ---- Add fields ----
   await addField(page, 'Short text', 'Patient Name', { mandatory: true })
@@ -52,7 +54,7 @@ test('admin builds and publishes a form, a patient submits it, admin sees the re
   await expect(page.getByRole('textbox', { name: 'Option 3' })).toHaveValue('Other')
 
   // An unsaved draft still says Draft.
-  await expect(page.locator('.p-tag')).toHaveText('Draft')
+  await expect(statusTag(page)).toHaveText('Draft')
 
   // ---- Preview checks mandatory fields ----
   await page.getByRole('button', { name: 'Preview' }).click()
@@ -71,7 +73,7 @@ test('admin builds and publishes a form, a patient submits it, admin sees the re
   await expect(confirmDialog).toContainText('Publish this form?')
   await confirmDialog.getByRole('button', { name: 'Publish' }).click()
   await expect(toast(page, 'Published')).toBeVisible()
-  await expect(page.locator('.p-tag')).toHaveText('Published')
+  await expect(statusTag(page)).toHaveText('Published')
   await expect(page.locator('.field-item .pi-lock')).toHaveCount(4)
 
   // ---- The share panel shows a readable public link ----
