@@ -35,7 +35,7 @@
           <Button label="Preview" icon="pi pi-eye" severity="secondary" outlined @click="showPreview = true" />
           <Button v-if="canManage" label="Save" icon="pi pi-save" :severity="kind === 'form' ? 'secondary' : undefined"
                   :loading="b.saving.value" :disabled="!b.dirty.value" @click="save" />
-          <Button v-if="kind === 'form' && canManage" :label="b.isDraft.value ? 'Publish' : 'Publish changes'" icon="pi pi-upload"
+          <Button v-if="kind === 'form' && canPublish" :label="b.isDraft.value ? 'Publish' : 'Publish changes'" icon="pi pi-upload"
                   :loading="b.publishing.value || publishSaving" :disabled="!b.canPublish.value || publishSaving"
                   @click="confirmPublish" />
         </div>
@@ -47,6 +47,7 @@
         :formSlug="slug"
         :accepting="b.form.value.accepting_submissions === FLAG_YES"
         :busy="shareBusy"
+        :canShare="can(tenantCode, 'forms', 'share')"
         @toggle-accepting="toggleAccepting"
       />
 
@@ -137,10 +138,12 @@ const props = defineProps({
   slug: { type: String, required: true },
   kind: { type: String, default: 'form' }
 })
-const canManage = computed(() => can(props.tenantCode, `${props.kind}s.manage`))
-const canRows = computed(() => can(props.tenantCode, props.kind === 'form' ? 'submissions.view' : 'lists.view'))
 
 const b = useBuilder(props.tenantCode, props.slug, props.kind)
+// Builder page actions ("forms" / "lists"); the rows button needs that form's / list's own page.
+const canManage = computed(() => can(props.tenantCode, `${props.kind}s`, 'edit'))
+const canPublish = computed(() => can(props.tenantCode, 'forms', 'publish'))
+const canRows = computed(() => !!b.form.value && can(props.tenantCode, `${props.kind}:${b.form.value.id}`))
 const catalog = useCatalog(props.tenantCode)
 const meta = computed(() => KINDS[props.kind])
 // Appointment slots only make sense in forms.

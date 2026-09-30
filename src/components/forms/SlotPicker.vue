@@ -43,7 +43,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 
-const REASONS = { full: 'Full', leave: 'Not available', ended: 'Ended' }
+const REASONS = { full: 'Full', leave: 'Not available', ended: 'Ended', closed: 'Session ended' }
 const info = computed(() => props.field.slot || {})
 const range = computed(() => {
   const d = info.value.dates
@@ -95,8 +95,14 @@ function choose(w) {
 
 watch(() => props.api, async (api) => {
   if (!api) return
-  if (info.value.where) wheres.value = await run('where', () => api.options('where'))
-  else await loadWhos()
+  if (info.value.where) {
+    wheres.value = await run('where', () => api.options('where'))
+    // A branch QR poster opens the form with its branch already chosen.
+    if (api.preferredWhere && wheres.value.some((w) => w.id === api.preferredWhere)) {
+      pick.where_id = api.preferredWhere
+      await loadWhos()
+    }
+  } else await loadWhos()
 }, { immediate: true })
 
 watch(() => props.refreshKey, loadWindows)

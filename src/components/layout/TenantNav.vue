@@ -24,7 +24,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { CLINIC_TABS, ROUTES } from '@/router'
 import { loadTenant } from '@/composables/useTenant'
-import { can, clinics, isPlatformAdmin } from '@/services/auth'
+import { clinics, isPlatformAdmin } from '@/services/auth'
 
 const props = defineProps({
   tenantCode: { type: String, required: true },
@@ -33,7 +33,7 @@ const props = defineProps({
 })
 
 // Only the tabs this user may open; the clinic list only for people who have more than one clinic.
-const tabs = computed(() => CLINIC_TABS.filter((t) => can(props.tenantCode, t.permission)))
+const tabs = computed(() => CLINIC_TABS.filter((t) => t.allowed(props.tenantCode)))
 const showTenants = computed(() => isPlatformAdmin.value || clinics.value.length > 1)
 
 const tenant = ref(null)

@@ -64,3 +64,13 @@ export async function download(path, fileName) {
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
+
+// A file the API makes (e.g. a QR code image) as a Blob, sent with the login token.
+export async function fetchBlob(path) {
+  const response = await fetch(`${appConfig.apiBaseUrl}${path}`, { headers: authHeader() })
+  if (!response.ok) {
+    if (response.status === 401) unauthorized()
+    throw new ApiError(`Request failed (${response.status})`, response.status, {})
+  }
+  return response.blob()
+}

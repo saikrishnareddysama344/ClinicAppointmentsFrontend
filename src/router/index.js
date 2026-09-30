@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { appConfig } from '@/config/env'
-import { can, clinics, isPlatformAdmin, loadUser, mustChangePassword, user } from '@/services/auth'
+import { can, clinics, hasPageLike, isAdmin, isPlatformAdmin, loadUser, mustChangePassword, user } from '@/services/auth'
 
 export const ROUTES = Object.freeze({
   TENANTS: 'tenants',
@@ -10,9 +10,9 @@ export const ROUTES = Object.freeze({
   LISTS: 'lists',
   LIST_BUILDER: 'list-builder',
   LIST_ROWS: 'list-rows',
-  SCHEDULES: 'schedules',
-  SCHEDULE: 'schedule',
+  TIMINGS: 'timings',
   BOOKINGS: 'bookings',
+  SETTINGS: 'settings',
   USERS: 'users',
   ROLES: 'roles',
   LOGIN: 'login',
@@ -20,15 +20,20 @@ export const ROUTES = Object.freeze({
   PUBLIC_FORM: 'public-form'
 })
 
-// The tabs of a clinic, in order, with the permission each needs (TenantNav shows the allowed ones,
-// and opening a clinic goes to the first allowed tab).
+// The tabs of a clinic, in order, and who may open each (TenantNav shows the allowed ones, and
+// opening a clinic goes to the first allowed tab).
 export const CLINIC_TABS = Object.freeze([
-  { label: 'Forms', icon: 'pi pi-file-edit', route: ROUTES.FORMS, match: ['form', 'submission'], permission: 'forms.view' },
-  { label: 'Lists', icon: 'pi pi-table', route: ROUTES.LISTS, match: ['list'], permission: 'lists.view' },
-  { label: 'Schedules', icon: 'pi pi-calendar-clock', route: ROUTES.SCHEDULES, match: ['schedule'], permission: 'timings.view' },
-  { label: 'Bookings', icon: 'pi pi-ticket', route: ROUTES.BOOKINGS, match: ['booking'], permission: 'bookings.view' },
-  { label: 'Users', icon: 'pi pi-users', route: ROUTES.USERS, match: ['user'], permission: 'users.manage' },
-  { label: 'Roles', icon: 'pi pi-shield', route: ROUTES.ROLES, match: ['role'], permission: 'roles.view' }
+  { label: 'Bookings', icon: 'pi pi-ticket', route: ROUTES.BOOKINGS, match: ['booking'],
+    allowed: (code) => can(code, 'bookings') },
+  { label: 'Doctor timings', icon: 'pi pi-calendar-clock', route: ROUTES.TIMINGS, match: ['timing'],
+    allowed: (code) => can(code, 'timings') },
+  { label: 'Forms', icon: 'pi pi-file-edit', route: ROUTES.FORMS, match: ['form', 'submission'],
+    allowed: (code) => can(code, 'forms') || hasPageLike(code, 'form:') },
+  { label: 'Lists', icon: 'pi pi-table', route: ROUTES.LISTS, match: ['list'],
+    allowed: (code) => can(code, 'lists') || hasPageLike(code, 'list:') },
+  { label: 'Users', icon: 'pi pi-users', route: ROUTES.USERS, match: ['user'], allowed: isAdmin },
+  { label: 'Roles', icon: 'pi pi-shield', route: ROUTES.ROLES, match: ['role'], allowed: isAdmin },
+  { label: 'Clinic settings', icon: 'pi pi-cog', route: ROUTES.SETTINGS, match: ['setting'], allowed: isAdmin }
 ])
 
 // Forms and lists use the same three views; these route names differ per kind.
@@ -60,10 +65,11 @@ const routes = [
     meta: { title: 'Tenants' } },
   ...kindRoutes('form', 'forms', 'Forms'),
   ...kindRoutes('list', 'lists', 'Lists'),
-  { path: `${tenant}/schedules`, name: ROUTES.SCHEDULES, props: true, meta: { title: 'Schedules' },
-    component: () => import('@/views/schedules/SchedulesView.vue') },
-  { path: `${tenant}/schedules/:slug`, name: ROUTES.SCHEDULE, props: true, meta: { title: 'Schedule' },
-    component: () => import('@/views/schedules/ScheduleView.vue') },
+  { path: `${tenant}/timings`, name: ROUTES.TIMINGS, props: true, meta: { title: 'Doctor timings' },
+    component: () => import('@/views/schedules/TimingsView.vue') },
+  { path: `${tenant}/schedules/:rest(.*)*`, redirect: (to) => ({ name: ROUTES.TIMINGS, params: { tenantCode: to.params.tenantCode } }) },
+  { path: `${tenant}/settings`, name: ROUTES.SETTINGS, props: true, meta: { title: 'Clinic settings' },
+    component: () => import('@/views/settings/ClinicSettingsView.vue') },
   { path: `${tenant}/bookings`, name: ROUTES.BOOKINGS, props: true, meta: { title: 'Bookings' },
     component: () => import('@/views/schedules/BookingsView.vue') },
   { path: `${tenant}/users`, name: ROUTES.USERS, props: true, meta: { title: 'Users' },
@@ -89,7 +95,7 @@ const router = createRouter({
 
 // Where a clinic opens: its first tab the user may see.
 export function clinicHome(tenantCode) {
-  const tab = CLINIC_TABS.find((t) => can(tenantCode, t.permission)) || CLINIC_TABS[0]
+  const tab = CLINIC_TABS.find((t) => t.allowed(tenantCode)) || CLINIC_TABS[0]
   return { name: tab.route, params: { tenantCode } }
 }
 

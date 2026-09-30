@@ -39,19 +39,24 @@ src/
 │   ├── useBuilderConfig.js Builder rules + field types from the API (loaded once)
 │   ├── useBuilder.js       State and actions for editing a form or a list
 │   ├── useCatalog.js       A tenant's lists and schedules (pickers, list options)
+│   ├── useClinic.js        Clinic settings (booking setup, print settings), once per clinic; auto-print
 │   ├── useTenant.js        Tenant details, fetched once per tenant
 │   └── useNotify.js        Toast helpers
 ├── constants/              UI-only mappings (icons, input kinds, status names)
 ├── utils/format.js         Dates, display values, column-name preview, API field -> renderer field
+├── utils/print.js          Receipt, OP sheet and QR poster printing (hidden iframe, paper sizes)
 ├── components/
-│   ├── layout/AppHeader.vue, TenantNav.vue (breadcrumb + Forms | Lists | Schedules | Bookings)
+│   ├── layout/AppHeader.vue, TenantNav.vue (tabs the user's roles allow)
 │   ├── common/FormStatusTag.vue
 │   ├── builder/FieldList.vue, FieldSettings.vue, SharePanel.vue
-│   └── forms/FormRenderer.vue, SlotPicker.vue
+│   ├── forms/FormRenderer.vue, SlotPicker.vue
+│   └── roles/PageAccessEditor.vue   One page of a role: buttons, columns, row filter
 ├── views/
 │   ├── tenants/TenantsView.vue
 │   ├── definitions/DefinitionsView.vue, BuilderView.vue, RecordsView.vue   (forms and lists)
-│   ├── schedules/SchedulesView.vue, ScheduleView.vue, BookingsView.vue
+│   ├── schedules/BookingsView.vue (day queue, print, end session), TimingsView.vue (doctor timings, leave)
+│   ├── settings/ClinicSettingsView.vue   Clinic details, booking setup, printing, OP sheet
+│   ├── people/UsersView.vue, RolesView.vue
 │   └── public/PublicFormView.vue     The page patients see (/f/<code>/<slug>)
 └── assets/styles/main.css
 ```

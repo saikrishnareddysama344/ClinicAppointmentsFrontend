@@ -31,13 +31,34 @@ export const isPlatformAdmin = computed(() => !!user.value?.is_platform_admin)
 export const mustChangePassword = computed(() => !!user.value?.must_change_password)
 export const clinics = computed(() => user.value?.clinics || [])
 
-// Permissions in one clinic (by code). Platform admins can do everything.
-export function can(tenantCode, permission) {
-  if (isPlatformAdmin.value) return true
-  const clinic = clinics.value.find((c) => c.code === tenantCode)
-  return !!clinic?.permissions.includes(permission)
+// What the user may do in one clinic (by code), from /v1/auth/me. App admins and the clinic's tenant
+// admins can do everything; others get pages -> actions / columns from their roles.
+// Pages: "forms", "lists", "timings", "bookings", "form:<id>" (a form's submissions), "list:<id>".
+const clinicOf = (tenantCode) => clinics.value.find((c) => c.code === tenantCode)
+
+export function isAdmin(tenantCode) {
+  return isPlatformAdmin.value || !!clinicOf(tenantCode)?.is_admin
 }
-export const canAny = (tenantCode, permissions) => permissions.some((p) => can(tenantCode, p))
+
+export function can(tenantCode, page, action = 'view') {
+  if (isAdmin(tenantCode)) return true
+  return !!clinicOf(tenantCode)?.pages?.[page]?.actions.includes(action)
+}
+
+// Any page whose key starts with prefix ("form:" = some form's submissions).
+export function hasPageLike(tenantCode, prefix) {
+  if (isAdmin(tenantCode)) return true
+  return Object.keys(clinicOf(tenantCode)?.pages || {}).some((key) => key.startsWith(prefix))
+}
+
+// "edit" | "display" | "hidden" for a column of a table page.
+export function columnLevel(tenantCode, page, column) {
+  if (isAdmin(tenantCode)) return 'edit'
+  return clinicOf(tenantCode)?.pages?.[page]?.columns?.[String(column)] || 'hidden'
+}
+
+// Does a row filter limit what this user sees on that page?
+export const isFiltered = (tenantCode, page) => !isAdmin(tenantCode) && !!clinicOf(tenantCode)?.pages?.[page]?.filtered
 
 // Loads the user once (after a page load); null when not logged in.
 export function loadUser() {

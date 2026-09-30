@@ -21,7 +21,8 @@
         <Button label="Refresh" icon="pi pi-refresh" severity="secondary" outlined :loading="loading" @click="load" />
         <Button v-if="canExport" label="Download CSV" icon="pi pi-download" severity="secondary"
                 :disabled="!total" :loading="downloading" @click="downloadCsv" />
-        <Button v-if="isList && canEdit" label="Add row" icon="pi pi-plus" :disabled="!definition" @click="openEditor(null)" />
+        <Button v-if="canAdd" :label="isList ? 'Add row' : 'Add submission'" icon="pi pi-plus" :disabled="!definition"
+                @click="openEditor(null)" />
       </div>
     </div>
 
@@ -43,11 +44,11 @@
             </span>
           </template>
         </Column>
-        <Column v-if="isList && canEdit" style="width: 110px">
+        <Column v-if="canEdit || (isList && canDeactivate)" style="width: 110px">
           <template #body="{ data }">
             <div class="actions">
-              <Button icon="pi pi-pencil" text rounded aria-label="Edit" v-tooltip.top="'Edit'" @click="openEditor(data)" />
-              <Button :icon="data.status === 'active' ? 'pi pi-eye-slash' : 'pi pi-eye'" text rounded
+              <Button v-if="canEdit" icon="pi pi-pencil" text rounded aria-label="Edit" v-tooltip.top="'Edit'" @click="openEditor(data)" />
+              <Button v-if="isList && canDeactivate" :icon="data.status === 'active' ? 'pi pi-eye-slash' : 'pi pi-eye'" text rounded
                       :aria-label="data.status === 'active' ? 'Deactivate' : 'Reactivate'"
                       v-tooltip.top="data.status === 'active' ? 'Deactivate (hidden from new choices)' : 'Reactivate'"
                       @click="toggleStatus(data)" />
@@ -57,9 +58,16 @@
       </DataTable>
     </div>
 
-    <Dialog v-model:visible="editor.open" modal :header="editor.row ? 'Edit row' : 'Add row'" :style="{ width: '520px' }">
+    <Dialog v-model:visible="editor.open" modal :header="`${editor.row ? 'Edit' : 'Add'} ${noun}`" :style="{ width: '520px' }">
       <Message v-if="editor.error" severity="error" class="mb">{{ editor.error }}</Message>
-      <FormRenderer :fields="fields" :initialValues="editor.initial" :initialLabels="editor.labels" :optionsLoader="listOptionsFor"
+      <div v-if="editor.row && readOnlyFields.length" class="read-only mb">
+        <div v-for="f in readOnlyFields" :key="f.key" class="ro-row">
+          <span class="muted">{{ f.display_label }}</span>
+          <span>{{ displayValue(f.data_type, editor.row[f.column_name]) }}</span>
+        </div>
+      </div>
+      <FormRenderer :fields="editableFields" :initialValues="editor.initial" :initialLabels="editor.labels" :optionsLoader="listOptionsFor"
+                    :slotApi="isList ? null : slotApi"
                     :staticSource="config.staticSource.value || 'static'"
                     :defaultTextLength="config.limits.value.default_text_length || 255"
                     :defaultPhoneLength="config.limits.value.default_phone_length || 20"
@@ -75,8 +83,10 @@ import TenantNav from '@/components/layout/TenantNav.vue'
 import { useBuilderConfig } from '@/composables/useBuilderConfig'
 import { useCatalog } from '@/composables/useCatalog'
 import { useNotify } from '@/composables/useNotify'
+import { autoPrintBooking } from '@/composables/useClinic'
 import { KIND_ROUTES } from '@/router'
-import { definitionApis } from '@/services/api'
+import { SLOT_TYPE } from '@/constants/fieldTypes'
+import { definitionApis, publicApi } from '@/services/api'
 import { can } from '@/services/auth'
 import { displayValue, rendererField, toApiValue } from '@/utils/format'
 
@@ -95,9 +105,15 @@ const config = useBuilderConfig()
 const isList = computed(() => props.kind === 'list')
 const api = computed(() => definitionApis[props.kind])
 const title = computed(() => (isList.value ? 'Rows' : 'Submissions'))
-const noun = computed(() => (isList.value ? 'row' : 'response'))
-const canEdit = computed(() => can(props.tenantCode, isList.value ? 'rows.edit' : 'submissions.edit'))
-const canExport = computed(() => can(props.tenantCode, isList.value ? 'lists.view' : 'submissions.export'))
+const noun = computed(() => (isList.value ? 'row' : 'submission'))
+// This form's / list's own page ("form:<id>" / "list:<id>") decides the buttons; its columns come
+// from the API already limited to what the role may see (field.access: edit / display).
+const pageKey = computed(() => definition.value && `${props.kind}:${definition.value.id}`)
+const allowed = (action) => !!pageKey.value && can(props.tenantCode, pageKey.value, action)
+const canAdd = computed(() => allowed(isList.value ? 'add' : 'edit'))
+const canEdit = computed(() => allowed('edit'))
+const canDeactivate = computed(() => allowed('deactivate'))
+const canExport = computed(() => allowed('export'))
 
 const definition = ref(null)
 const columns = ref([])
@@ -122,7 +138,22 @@ async function downloadCsv() {
     downloading.value = false
   }
 }
-const fields = computed(() => (definition.value?.fields || []).filter((f) => f.column_name).map(rendererField))
+// Appointment slots (forms) are picked like on the public form: its who / where names and windows.
+const slotInfo = ref({})
+const slotApi = (field) => ({
+  options: async (part, whereId) =>
+    (await publicApi.options(props.tenantCode, props.slug, field.id, { part, where_id: whereId })).options,
+  availability: (params) => publicApi.availability(props.tenantCode, props.slug, field.id, params)
+})
+const fields = computed(() => (definition.value?.fields || []).filter((f) => f.column_name)
+  .map((f) => rendererField({ ...f, slot: slotInfo.value[f.id] })))
+const accessOf = (key) => (definition.value?.fields || []).find((f) => String(f.id) === String(key))?.access || 'hidden'
+// A booking is made when a submission is added; an existing one is changed on the Bookings page.
+const fixedSlot = (f) => editor.row && f.data_type === SLOT_TYPE
+const editableFields = computed(() => fields.value.filter((f) => accessOf(f.key) === 'edit' && !fixedSlot(f)))
+const readOnlyFields = computed(() => fields.value.filter((f) => accessOf(f.key) === 'display'
+  || (accessOf(f.key) === 'edit' && fixedSlot(f)))
+  .map((f) => ({ ...f, column_name: (definition.value.fields.find((d) => String(d.id) === String(f.key)) || {}).column_name })))
 
 async function load() {
   loading.value = true
@@ -186,11 +217,15 @@ function listOptionsFor(field, parentValue) {
 }
 
 async function saveRow(answers) {
-  const values = Object.fromEntries(fields.value.map((f) => [f.key, toApiValue(f.data_type, answers[f.key])]))
+  // Only the columns this role may edit are sent; the others keep their values.
+  const values = Object.fromEntries(editableFields.value.map((f) => [f.key, toApiValue(f.data_type, answers[f.key])]))
   Object.assign(editor, { saving: true, errors: {}, error: '' })
   try {
     if (editor.row) await api.value.updateRow(props.tenantCode, props.slug, editor.row.id, values)
-    else await api.value.addRow(props.tenantCode, props.slug, values)
+    else {
+      const saved = await api.value.addRow(props.tenantCode, props.slug, values)
+      autoPrintBooking(props.tenantCode, saved.booking).catch((e) => notify.error('Could not print', e))
+    }
     editor.open = false
     notify.success('Saved')
     load()
@@ -218,12 +253,30 @@ watch(() => [props.tenantCode, props.slug, props.kind], () => {
   loaded.value = false
   definition.value = null
   api.value.get(props.tenantCode, props.slug).then((r) => (definition.value = r[props.kind])).catch(() => {})
-  if (isList.value) Promise.all([catalog.load(), config.load()]).catch(() => {})
+  slotInfo.value = {}
+  Promise.all([catalog.load(), config.load()]).catch(() => {})
+  if (!isList.value) {   // slot names (Doctors / Branches) come with the published form
+    publicApi.getForm(props.tenantCode, props.slug)
+      .then((r) => (slotInfo.value = Object.fromEntries(r.form.fields.filter((f) => f.slot).map((f) => [f.id, f.slot]))))
+      .catch(() => {})
+  }
   load()
 }, { immediate: true })
 </script>
 
 <style scoped>
+.read-only {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.ro-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .mb {
   margin-bottom: 1rem;
 }

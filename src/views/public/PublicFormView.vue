@@ -33,6 +33,9 @@
             <span>{{ [booking.who, booking.where].filter(Boolean).join(' · ') }}</span>
             <span>{{ displayValue('date', booking.date) }}, {{ booking.start }}–{{ booking.end }}</span>
           </div>
+          <Button v-if="booking?.receipt_code" label="Print / save receipt" icon="pi pi-print" class="mb"
+                  :loading="printing" @click="printReceipt" />
+          <Message v-if="receiptError" severity="warn" class="mb">{{ receiptError }}</Message>
           <Button label="Submit another response" severity="secondary" outlined @click="startAgain" />
         </div>
 
@@ -67,9 +70,11 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import FormRenderer from '@/components/forms/FormRenderer.vue'
 import { publicApi } from '@/services/api'
 import { displayValue, rendererField, toApiValue } from '@/utils/format'
+import { printBooking } from '@/utils/print'
 
 const props = defineProps({
   tenantCode: { type: String, required: true },
@@ -94,7 +99,12 @@ const fields = computed(() => (form.value?.fields || []).map(rendererField))
 // Dropdowns fed by a list, and the appointment picker, load their choices from the API.
 const loadOptions = async (field, parentValue) =>
   (await publicApi.options(props.tenantCode, props.formSlug, field.id, { depends_value: parentValue })).options
+// A QR poster's link says where it came from (src=qr) and may choose the branch (branch=<id>).
+const route = useRoute()
+const source = route.query.src === 'qr' ? 'qr' : 'link'
+const preferredWhere = Number(route.query.branch) || null
 const slotApi = (field) => ({
+  preferredWhere,
   options: async (part, whereId) =>
     (await publicApi.options(props.tenantCode, props.formSlug, field.id, { part, where_id: whereId })).options,
   availability: (params) => publicApi.availability(props.tenantCode, props.formSlug, field.id, params)
@@ -129,6 +139,7 @@ async function submit(answers) {
   try {
     const result = await publicApi.submit(props.tenantCode, props.formSlug, {
       values,
+      source,
       [form.value.honeypot_field]: honeypot.value
     })
     successMessage.value = result.message
@@ -144,8 +155,23 @@ async function submit(answers) {
   }
 }
 
+const printing = ref(false)
+const receiptError = ref('')
+async function printReceipt() {
+  printing.value = true
+  receiptError.value = ''
+  try {
+    printBooking(await publicApi.receipt(props.tenantCode, props.formSlug, booking.value.receipt_code), ['receipt'])
+  } catch (e) {
+    receiptError.value = e.httpStatus === 404 ? 'This clinic does not offer printed receipts online.' : e.message
+  } finally {
+    printing.value = false
+  }
+}
+
 function startAgain() {
   clearServerErrors()
+  receiptError.value = ''
   honeypot.value = ''
   state.value = 'ready'
   renderer.value?.reset()

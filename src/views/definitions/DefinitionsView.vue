@@ -7,12 +7,12 @@
         <h1>{{ meta.plural }}</h1>
         <p class="sub">{{ intro }}</p>
       </div>
-      <Button v-if="canManage" :label="`New ${label}`" icon="pi pi-plus" @click="openCreate" />
+      <Button v-if="canDo('create')" :label="`New ${label}`" icon="pi pi-plus" @click="openCreate" />
     </div>
 
     <div class="panel">
       <DataTable :value="items" :loading="loading" dataKey="id" rowHover
-                 :rowClass="() => 'clickable-row'" @row-click="(e) => openBuilder(e.data)">
+                 :rowClass="() => 'clickable-row'" @row-click="(e) => (isBuilder ? openBuilder(e.data) : e.data.status !== FORM_STATUS.DRAFT && canRows(e.data) && openRows(e.data))">
         <template #empty>
           <div class="empty">
             <i class="pi pi-file-edit" aria-hidden="true" />
@@ -39,11 +39,11 @@
         <Column style="width: 130px">
           <template #body="{ data }">
             <div class="actions" @click.stop>
-              <Button icon="pi pi-pencil" text rounded aria-label="Open builder" v-tooltip.top="'Open builder'"
+              <Button v-if="isBuilder" icon="pi pi-pencil" text rounded aria-label="Open builder" v-tooltip.top="'Open builder'"
                       @click="openBuilder(data)" />
-              <Button v-if="data.status !== FORM_STATUS.DRAFT && canRows" :icon="kind === 'form' ? 'pi pi-inbox' : 'pi pi-table'"
+              <Button v-if="data.status !== FORM_STATUS.DRAFT && canRows(data)" :icon="kind === 'form' ? 'pi pi-inbox' : 'pi pi-table'"
                       text rounded :aria-label="rowsLabel" v-tooltip.top="rowsLabel" @click="openRows(data)" />
-              <Button v-if="data.status === FORM_STATUS.DRAFT && canManage" icon="pi pi-trash" text rounded severity="danger"
+              <Button v-if="data.status === FORM_STATUS.DRAFT && canDo('delete')" icon="pi pi-trash" text rounded severity="danger"
                       aria-label="Delete draft" v-tooltip.top="'Delete draft'" @click="confirmDelete(data)" />
             </div>
           </template>
@@ -96,8 +96,10 @@ const props = defineProps({
   tenantCode: { type: String, required: true },
   kind: { type: String, default: 'form' }
 })
-const canManage = computed(() => can(props.tenantCode, `${props.kind}s.manage`))
-const canRows = computed(() => can(props.tenantCode, props.kind === 'form' ? 'submissions.view' : 'lists.view'))
+// The builder page ("forms" / "lists") and each one's own rows page ("form:12" / "list:7").
+const canDo = (action) => can(props.tenantCode, `${props.kind}s`, action)
+const isBuilder = computed(() => canDo('view'))
+const canRows = (item) => can(props.tenantCode, `${props.kind}:${item.id}`)
 
 const router = useRouter()
 const notify = useNotify()

@@ -109,10 +109,11 @@
 
       <template v-if="field.data_type === SLOT_TYPE">
         <div class="field">
-          <label for="f-schedule">Schedule<span class="required-star">*</span></label>
-          <Select id="f-schedule" v-model="field.schedule_id" :options="schedules" optionLabel="display_name"
-                  optionValue="id" :disabled="locked" placeholder="Choose a schedule" fluid />
-          <small class="hint">Patients pick {{ scheduleParts }}, a date, and a time window, and get a token.</small>
+          <Message v-if="!schedules.length" severity="warn">
+            Set up booking first: Clinic settings, Booking setup (choose the Doctors and Branches lists).
+          </Message>
+          <small v-else class="hint">Uses the clinic's booking setup: patients pick {{ scheduleParts }}, a date,
+            and a time window, and get a token.</small>
         </div>
         <div class="field">
           <label for="f-contact">One booking per phone number</label>
@@ -159,7 +160,7 @@ const parents = computed(() => props.siblings.slice(0, Math.max(index.value, 0))
   .filter((f) => f.id && f.data_type === DROPDOWN_TYPE && f.source === LIST_SOURCE && f.list_id))
 const phoneFields = computed(() => props.siblings.filter((f) => f.id && f.data_type === 'phone'))
 const scheduleParts = computed(() => {
-  const s = props.schedules.find((x) => x.id === props.field?.schedule_id)
+  const s = props.schedules.find((x) => x.id === props.field?.schedule_id) || props.schedules[0]
   return s ? [s.where_list?.name, s.who_list.name].filter(Boolean).join(', ') : 'who (and where)'
 })
 

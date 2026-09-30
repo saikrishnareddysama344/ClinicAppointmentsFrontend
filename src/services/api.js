@@ -1,6 +1,6 @@
 // All backend endpoints, grouped by area. Views never build URLs themselves.
 // Tenants are addressed by their code; forms, lists and schedules by their link name (slug).
-import { download, request } from './http'
+import { download, fetchBlob, request } from './http'
 
 const enc = encodeURIComponent
 
@@ -40,9 +40,17 @@ export const usersApi = (() => {
   }
 })()
 
+// Clinic details, booking setup (Doctors / Branches lists), print settings, OP sheet template.
+export const clinicApi = {
+  info: (t) => request('GET', `/v1/tenants/${enc(t)}/clinic`),          // any member
+  setup: (t) => request('GET', `/v1/tenants/${enc(t)}/setup`),          // admins (adds the lists)
+  saveSetup: (t, payload) => request('PUT', `/v1/tenants/${enc(t)}/setup`, payload)
+}
+
 export const rolesApi = (() => {
   const base = (t) => `/v1/tenants/${enc(t)}/roles`
   return {
+    catalog: (t) => request('GET', `/v1/tenants/${enc(t)}/access-catalog`),
     list: (t) => request('GET', base(t)),
     create: (t, payload) => request('POST', base(t), payload),
     update: (t, id, payload) => request('PUT', `${base(t)}/${id}`, payload),
@@ -98,7 +106,13 @@ export const schedulesApi = (() => {
     // part: 'windows' | 'leaves'
     setStatus: (t, slug, part, id, active) => request('PUT', `${one(t, slug)}/${part}/${id}/status`, { active }),
     bookings: (t, slug, params) => request('GET', `${one(t, slug)}/bookings${qs(params)}`),
-    cancelBooking: (t, slug, id) => request('PUT', `${one(t, slug)}/bookings/${id}/cancel`)
+    cancelBooking: (t, slug, id) => request('PUT', `${one(t, slug)}/bookings/${id}/cancel`),
+    // Today's queue: status = arrived | not_attended (to the end of the list) | done | waiting
+    setVisit: (t, slug, id, status) => request('PUT', `${one(t, slug)}/bookings/${id}/visit`, { status }),
+    // Record a print and get what to print: kinds = ['receipt', 'op'], bill = {lines, mode} (optional)
+    print: (t, slug, id, kinds, bill) => request('POST', `${one(t, slug)}/bookings/${id}/print`, { kinds, ...(bill ? { bill } : {}) }),
+    endSession: (t, slug, windowId, date) => request('POST', `${one(t, slug)}/sessions`, { window_id: windowId, date }),
+    reopenSession: (t, slug, windowId, date) => request('DELETE', `${one(t, slug)}/sessions${qs({ window_id: windowId, date })}`)
   }
 })()
 
@@ -110,13 +124,16 @@ export const publicApi = (() => {
     // List dropdowns: {depends_value}. Appointment slots: {part: 'where' | 'who', where_id}.
     options: (t, slug, fieldId, params) => request('GET', `${base(t, slug)}/fields/${fieldId}/options${qs(params)}`),
     availability: (t, slug, fieldId, params) =>
-      request('GET', `${base(t, slug)}/fields/${fieldId}/availability${qs(params)}`)
+      request('GET', `${base(t, slug)}/fields/${fieldId}/availability${qs(params)}`),
+    // A patient's own receipt, with the code returned when they booked
+    receipt: (t, slug, code) => request('GET', `${base(t, slug)}/receipts/${enc(code)}`)
   }
 })()
 
 export const metaApi = {
   builder: () => request('GET', '/v1/meta/builder'),
   dataTypes: () => request('GET', '/v1/getDataTypes'),
-  permissions: () => request('GET', '/v1/meta/permissions'),
+  // A QR code image for a link: format 'svg' | 'png' (a Blob)
+  qr: (text, format = 'svg', scale = 8) => fetchBlob(`/v1/meta/qr${qs({ text, format, scale })}`),
   health: () => request('GET', '/v1/health')
 }
