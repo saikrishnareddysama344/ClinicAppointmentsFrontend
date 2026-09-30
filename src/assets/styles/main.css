@@ -1,0 +1,305 @@
+/* Layout styles. Colors come from PrimeVue theme variables, so light and dark both work. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  background: var(--p-surface-50);
+  color: var(--p-text-color);
+}
+
+@media (prefers-color-scheme: dark) {
+  html,
+  body {
+    background: var(--p-surface-950);
+  }
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 1.25rem;
+  height: 56px;
+  background: var(--p-content-background);
+  border-bottom: 1px solid var(--p-content-border-color);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--p-text-color);
+  text-decoration: none;
+}
+
+.app-header .brand i {
+  color: var(--p-primary-color);
+  font-size: 1.2rem;
+}
+
+.app-header .tag-line {
+  color: var(--p-text-muted-color);
+  font-size: 0.85rem;
+}
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.page-head h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 650;
+}
+
+.page-head .sub {
+  margin: 0.25rem 0 0;
+  color: var(--p-text-muted-color);
+}
+
+.crumbs {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+  margin-bottom: 0.5rem;
+}
+
+.crumbs a {
+  color: var(--p-primary-color);
+  text-decoration: none;
+}
+
+.panel {
+  background: var(--p-content-background);
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 10px;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.muted {
+  color: var(--p-text-muted-color);
+}
+
+.mono {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 3rem 1rem;
+  text-align: center;
+  color: var(--p-text-muted-color);
+}
+
+.empty i {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+/* Forms inside dialogs and the field editor */
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field > label {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.field .hint {
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+}
+
+.field .error {
+  font-size: 0.8rem;
+  color: var(--p-red-500);
+}
+
+.required-star {
+  color: var(--p-red-500);
+  margin-left: 2px;
+}
+
+.row-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* Builder */
+.builder {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.2fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .builder {
+    grid-template-columns: 1fr;
+  }
+}
+
+.builder-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+  font-weight: 600;
+}
+
+.field-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.field-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.5rem 0.6rem 0.75rem;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--p-content-background);
+}
+
+.field-item:hover {
+  border-color: var(--p-primary-300);
+}
+
+.field-item.selected {
+  border-color: var(--p-primary-color);
+  box-shadow: 0 0 0 1px var(--p-primary-color);
+}
+
+.field-item.has-error {
+  border-color: var(--p-red-400);
+}
+
+.field-item .order {
+  width: 1.5rem;
+  text-align: center;
+  color: var(--p-text-muted-color);
+  font-size: 0.8rem;
+}
+
+.field-item .info {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-item .label {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.field-item .meta {
+  font-size: 0.78rem;
+  color: var(--p-text-muted-color);
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.field-item .tools {
+  display: flex;
+  gap: 0;
+}
+
+.editor-body {
+  padding: 1rem;
+}
+
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.options-list .option-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.lock-note {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-size: 0.82rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  background: var(--p-highlight-background);
+  color: var(--p-highlight-color);
+}
+
+.preview-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.preview-banner {
+  font-size: 0.82rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: var(--p-highlight-background);
+  color: var(--p-highlight-color);
+  margin-bottom: 1rem;
+}
+
+.clickable-row {
+  cursor: pointer;
+}
