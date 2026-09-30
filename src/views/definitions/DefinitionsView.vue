@@ -57,9 +57,11 @@
           <label for="form-name">{{ meta.label }} name<span class="required-star">*</span></label>
           <InputText id="form-name" v-model="draft.name" fluid autofocus :placeholder="kind === 'form' ? 'Appointment booking' : 'Doctors'"
                      @input="syncSlug" />
+          <small v-if="kind === 'list'" class="hint">For example Doctors, Branches or Services. Any form can use it.</small>
           <small v-if="errors.display_name" class="error">{{ errors.display_name }}</small>
         </div>
-        <div class="field">
+        <!-- Only forms need a chosen link name (it is the public link); a list's is made from its name. -->
+        <div v-if="kind === 'form'" class="field">
           <label for="form-slug">Link name</label>
           <InputText id="form-slug" v-model="draft.slug" fluid class="mono" placeholder="appointment-booking"
                      @input="slugEdited = true" />
@@ -147,7 +149,8 @@ async function createForm() {
   Object.assign(errors, { display_name: '', slug: '' })
   saving.value = true
   try {
-    const result = await api.value.create(props.tenantCode, { display_name: draft.name, slug: draft.slug })
+    const result = await api.value.create(props.tenantCode,
+      { display_name: draft.name, ...(props.kind === 'form' ? { slug: draft.slug } : {}) })
     showCreate.value = false
     openBuilder(result[props.kind])
   } catch (e) {
