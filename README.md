@@ -29,28 +29,29 @@ On Render, set `VITE_API_BASE_URL` (the backend address) in the static site's En
 
 ```
 src/
-├── main.js                 App bootstrap (PrimeVue, router, toasts)
-├── App.vue
+├── main.js                 App bootstrap (PrimeVue components registered here, router, toasts)
 ├── config/env.js           Reads VITE_* settings (only place that touches import.meta.env)
-├── router/index.js         Routes and route names
+├── router/index.js         Routes; forms and lists share three views (kind = form | list)
 ├── services/
 │   ├── http.js             fetch wrapper + ApiError
-│   └── api.js              Every backend endpoint
+│   └── api.js              Every backend endpoint (one factory for forms and lists)
 ├── composables/
 │   ├── useBuilderConfig.js Builder rules + field types from the API (loaded once)
-│   ├── useFormBuilder.js   State and actions for editing a form
+│   ├── useBuilder.js       State and actions for editing a form or a list
+│   ├── useCatalog.js       A tenant's lists and schedules (pickers, list options)
+│   ├── useTenant.js        Tenant details, fetched once per tenant
 │   └── useNotify.js        Toast helpers
 ├── constants/              UI-only mappings (icons, input kinds, status names)
-├── utils/format.js         Dates, column-name preview, tenant code
+├── utils/format.js         Dates, display values, column-name preview, API field -> renderer field
 ├── components/
-│   ├── layout/AppHeader.vue
+│   ├── layout/AppHeader.vue, TenantNav.vue (breadcrumb + Forms | Lists | Schedules | Bookings)
 │   ├── common/FormStatusTag.vue
 │   ├── builder/FieldList.vue, FieldSettings.vue, SharePanel.vue
-│   └── forms/FormRenderer.vue
+│   └── forms/FormRenderer.vue, SlotPicker.vue
 ├── views/
 │   ├── tenants/TenantsView.vue
-│   ├── forms/FormsView.vue, FormBuilderView.vue, SubmissionsView.vue
+│   ├── definitions/DefinitionsView.vue, BuilderView.vue, RecordsView.vue   (forms and lists)
+│   ├── schedules/SchedulesView.vue, ScheduleView.vue, BookingsView.vue
 │   └── public/PublicFormView.vue     The page patients see (/f/<code>/<slug>)
 └── assets/styles/main.css
 ```
-
