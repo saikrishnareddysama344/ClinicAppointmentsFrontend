@@ -110,7 +110,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, watch } from 'vue'
+import { computed, nextTick, reactive, watch } from 'vue'
 import SlotPicker from './SlotPicker.vue'
 import {
   EMAIL_PATTERN, INPUT_KIND_BY_INPUT_TYPE, INPUT_KIND_BY_TYPE, LIST_SOURCE, PHONE_PATTERN, WHOLE_NUMBER_TYPES
@@ -134,6 +134,8 @@ const props = defineProps({
   slotApi: { type: Function, default: null },
   // Starting answers keyed like the fields, e.g. when editing a list row
   initialValues: { type: Object, default: () => ({}) },
+  // Labels of starting list-dropdown values (a row that is now inactive is not in the options)
+  initialLabels: { type: Object, default: () => ({}) },
   // Bump to reload appointment times (e.g. after "this window is full")
   refreshKey: { type: Number, default: 0 }
 })
@@ -158,7 +160,9 @@ const waitingFor = (field) => {
   return parent && isEmpty(values[parent.key]) ? parent : null
 }
 
-async function loadOptions(field) {
+// initial: loading for the starting answers. Then a value missing from the options (an inactive row)
+// is kept and shown with its label; later, when the parent changes, it is cleared instead.
+async function loadOptions(field, initial) {
   const parent = parentOf(field)
   if (!props.optionsLoader || waitingFor(field)) {
     listOptions[field.key] = []
@@ -172,19 +176,22 @@ async function loadOptions(field) {
       loadingOptions[field.key] = false
     }
   }
-  // A choice that is no longer offered (the parent changed) is cleared.
-  if (!isEmpty(values[field.key]) && !listOptions[field.key].some((o) => o.id === values[field.key])) {
-    values[field.key] = null
+  const value = values[field.key]
+  if (!isEmpty(value) && !listOptions[field.key].some((o) => o.id === value)) {
+    if (initial) listOptions[field.key] = [{ id: value, label: props.initialLabels[field.key] ?? `#${value}` }, ...listOptions[field.key]]
+    else values[field.key] = null
   }
 }
 
 // One entry per list dropdown: its key and its parent's current value. Reload what changed.
 const dependencies = computed(() => props.fields.filter(isList)
   .map((f) => `${f.key}:${parentOf(f) ? values[parentOf(f).key] ?? '' : ''}`))
+let initialPass = true   // true while the starting answers are being applied
 watch(dependencies, (now, before = []) => {
+  const seen = new Set(before.map((e) => e.split(':')[0]))
   for (const entry of now.filter((e) => !before.includes(e))) {
     const field = props.fields.find((f) => f.key === entry.split(':')[0])
-    if (field) loadOptions(field)
+    if (field) loadOptions(field, initialPass || !seen.has(field.key))
   }
 }, { immediate: true })
 
@@ -220,6 +227,8 @@ function reset() {
   for (const key of Object.keys(values)) delete values[key]
   for (const key of Object.keys(errors)) delete errors[key]
   Object.assign(values, props.initialValues)
+  initialPass = true
+  nextTick(() => { initialPass = false })   // after the option reloads this causes
 }
 
 defineExpose({ reset })

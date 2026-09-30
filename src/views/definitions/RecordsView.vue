@@ -59,7 +59,7 @@
 
     <Dialog v-model:visible="editor.open" modal :header="editor.row ? 'Edit row' : 'Add row'" :style="{ width: '520px' }">
       <Message v-if="editor.error" severity="error" class="mb">{{ editor.error }}</Message>
-      <FormRenderer :fields="fields" :initialValues="editor.initial" :optionsLoader="listOptionsFor"
+      <FormRenderer :fields="fields" :initialValues="editor.initial" :initialLabels="editor.labels" :optionsLoader="listOptionsFor"
                     :staticSource="config.staticSource.value || 'static'"
                     :defaultTextLength="config.limits.value.default_text_length || 255"
                     :defaultPhoneLength="config.limits.value.default_phone_length || 20"
@@ -142,12 +142,13 @@ function onPage(event) {
 }
 
 // ---------- editing list rows ----------
-const editor = reactive({ open: false, row: null, initial: {}, errors: {}, error: '', saving: false })
+const editor = reactive({ open: false, row: null, initial: {}, labels: {}, errors: {}, error: '', saving: false })
 
-// The row's stored values keyed like the renderer's fields (list references by id).
+// The row's stored values keyed like the renderer's fields (list references by id, with their labels).
 function valuesOf(row) {
   const byColumn = Object.fromEntries((definition.value?.fields || []).map((f) => [f.column_name, f]))
   const values = {}
+  const labels = {}
   for (const col of columns.value) {
     const f = byColumn[col.key]
     if (!f) continue
@@ -156,12 +157,14 @@ function valuesOf(row) {
       value = f.data_type === 'date' ? new Date(`${value}T00:00:00`) : new Date(`1970-01-01T${value}`)
     }
     values[String(f.id)] = value
+    if (row[`${col.key}__id`] != null) labels[String(f.id)] = row[col.key]
   }
-  return values
+  return { values, labels }
 }
 
 function openEditor(row) {
-  Object.assign(editor, { open: true, row, initial: row ? valuesOf(row) : {}, errors: {}, error: '' })
+  const { values, labels } = row ? valuesOf(row) : { values: {}, labels: {} }
+  Object.assign(editor, { open: true, row, initial: values, labels, errors: {}, error: '' })
 }
 
 function listOptionsFor(field, parentValue) {
