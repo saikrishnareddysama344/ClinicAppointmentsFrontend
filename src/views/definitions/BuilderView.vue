@@ -1,17 +1,9 @@
 <template>
   <main class="page">
-    <nav class="crumbs" aria-label="Breadcrumb">
-      <router-link :to="{ name: ROUTES.TENANTS }">Tenants</router-link>
-      <i class="pi pi-angle-right" aria-hidden="true" />
-      <router-link :to="{ name: ROUTES.FORMS, params: { tenantCode } }">
-        {{ b.form.value?.tenant?.name || tenantCode }}
-      </router-link>
-      <i class="pi pi-angle-right" aria-hidden="true" />
-      <span>{{ b.form.value?.display_name || '…' }}</span>
-    </nav>
+    <TenantNav :tenantCode="tenantCode" :crumbs="[{ label: b.form.value?.display_name || '…' }]" />
 
     <div v-if="b.loading.value" class="panel empty">
-      <i class="pi pi-spin pi-spinner" aria-hidden="true" />Loading form…
+      <i class="pi pi-spin pi-spinner" aria-hidden="true" />Loading…
     </div>
 
     <div v-else-if="loadError" class="panel empty">
@@ -23,34 +15,36 @@
       <div class="page-head">
         <div class="title-block">
           <div class="row-inline title-row">
-            <InputText v-model="b.formName.value" aria-label="Form name" class="title-input" fluid
+            <InputText v-model="b.formName.value" :aria-label="`${meta.label} name`" class="title-input" fluid
                        :maxlength="b.config.limits.value.max_label_length" />
-            <FormStatusTag :status="b.dirty.value && !b.isDraft.value ? FORM_STATUS.CHANGES_PENDING : b.form.value.status" />
+            <FormStatusTag v-if="kind === 'form'"
+                           :status="b.dirty.value && !b.isDraft.value ? FORM_STATUS.CHANGES_PENDING : b.form.value.status" />
           </div>
           <p class="sub">
             <template v-if="b.form.value.table_name">
               Data table <span class="mono">{{ b.form.value.schema_name }}.{{ b.form.value.table_name }}</span>
             </template>
-            <template v-else>The data table is created when you publish.</template>
+            <template v-else>The data table is created when you {{ kind === 'form' ? 'publish' : 'save' }}.</template>
             <span v-if="b.dirty.value"> · Unsaved changes</span>
           </p>
         </div>
         <div class="actions">
-          <Button v-if="!b.isDraft.value" label="Submissions" icon="pi pi-inbox" severity="secondary" text
-                  @click="router.push({ name: ROUTES.SUBMISSIONS, params: { tenantCode, formSlug } })" />
+          <Button v-if="!b.isDraft.value" :label="kind === 'form' ? 'Submissions' : 'Rows'"
+                  :icon="kind === 'form' ? 'pi pi-inbox' : 'pi pi-table'" severity="secondary" text
+                  @click="router.push({ name: KIND_ROUTES[kind].rows, params: { tenantCode, slug } })" />
           <Button label="Preview" icon="pi pi-eye" severity="secondary" outlined @click="showPreview = true" />
-          <Button label="Save" icon="pi pi-save" severity="secondary" :loading="b.saving.value"
-                  :disabled="!b.dirty.value" @click="save" />
-          <Button :label="b.isDraft.value ? 'Publish' : 'Publish changes'" icon="pi pi-upload"
+          <Button label="Save" icon="pi pi-save" :severity="kind === 'form' ? 'secondary' : undefined"
+                  :loading="b.saving.value" :disabled="!b.dirty.value" @click="save" />
+          <Button v-if="kind === 'form'" :label="b.isDraft.value ? 'Publish' : 'Publish changes'" icon="pi pi-upload"
                   :loading="b.publishing.value || publishSaving" :disabled="!b.canPublish.value || publishSaving"
                   @click="confirmPublish" />
         </div>
       </div>
 
       <SharePanel
-        v-if="!b.isDraft.value"
+        v-if="kind === 'form' && !b.isDraft.value"
         :tenantCode="tenantCode"
-        :formSlug="formSlug"
+        :formSlug="slug"
         :accepting="b.form.value.accepting_submissions === FLAG_YES"
         :busy="shareBusy"
         @toggle-accepting="toggleAccepting"
@@ -65,7 +59,7 @@
           :fields="b.fields.value"
           :selectedKey="b.selectedKey.value"
           :errors="b.fieldErrors"
-          :dataTypes="b.config.dataTypes.value"
+          :dataTypes="fieldTypes"
           :typeName="b.config.typeName"
           :isDraft="b.isDraft.value"
           :maxFields="b.config.limits.value.max_form_fields || 0"
@@ -80,27 +74,38 @@
           :field="b.selected.value"
           :errors="b.selected.value ? b.fieldErrors[b.selected.value.key] : []"
           :nameProblem="b.nameProblem(b.selected.value)"
-          :dataTypes="b.config.dataTypes.value"
+          :dataTypes="fieldTypes"
           :dropdownSources="b.config.dropdownSources.value"
           :staticSource="b.config.staticSource.value"
           :limits="b.config.limits.value"
           :isLengthType="b.config.isLengthType"
           :defaultLength="b.config.defaultLength"
           :columnPreview="b.config.columnPreview"
+          :isDisplayType="b.config.isDisplayType"
+          :kind="kind"
+          :siblings="b.fields.value"
+          :lists="catalog.lists.value.filter((l) => l.slug !== slug)"
+          :schedules="catalog.schedules.value"
+          :listDefinition="catalog.listDefinition"
           @type-change="b.onTypeChange"
+          @set-display="b.setDisplay"
         />
       </div>
     </template>
 
-    <Dialog v-model:visible="showPreview" modal :header="`Preview: ${b.formName.value || 'Form'}`"
+    <Dialog v-model:visible="showPreview" modal :header="`Preview: ${b.formName.value || meta.label}`"
             :style="{ width: '520px' }">
-      <div class="preview-banner">This is how patients will see the form. Nothing is saved from here.</div>
+      <div class="preview-banner">
+        {{ kind === 'form' ? 'This is how patients will see the form.' : 'This is the form staff use to add a row.' }}
+        Nothing is saved from here.
+      </div>
       <FormRenderer
         :fields="b.fields.value"
         :inputTypes="b.config.inputTypes.value"
         :staticSource="b.config.staticSource.value"
         :defaultTextLength="b.config.limits.value.default_text_length"
         :defaultPhoneLength="b.config.limits.value.default_phone_length"
+        :optionsLoader="previewOptions"
         @submitted="notify.info('Preview only', 'The form is valid. Nothing was saved from the preview.')"
       />
     </Dialog>
@@ -108,7 +113,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
 import FieldList from '@/components/builder/FieldList.vue'
@@ -116,17 +121,33 @@ import FieldSettings from '@/components/builder/FieldSettings.vue'
 import SharePanel from '@/components/builder/SharePanel.vue'
 import FormStatusTag from '@/components/common/FormStatusTag.vue'
 import FormRenderer from '@/components/forms/FormRenderer.vue'
-import { useFormBuilder } from '@/composables/useFormBuilder'
+import TenantNav from '@/components/layout/TenantNav.vue'
+import { useBuilder } from '@/composables/useBuilder'
+import { useCatalog } from '@/composables/useCatalog'
 import { useNotify } from '@/composables/useNotify'
+import { SLOT_TYPE } from '@/constants/fieldTypes'
 import { FLAG_YES, FORM_STATUS } from '@/constants/formStatus'
-import { ROUTES } from '@/router'
+import { KIND_ROUTES } from '@/router'
+import { KINDS } from '@/services/api'
 
+// The builder for a form or a list (kind); a list is published by every save.
 const props = defineProps({
   tenantCode: { type: String, required: true },
-  formSlug: { type: String, required: true }
+  slug: { type: String, required: true },
+  kind: { type: String, default: 'form' }
 })
 
-const b = useFormBuilder(props.tenantCode, props.formSlug)
+const b = useBuilder(props.tenantCode, props.slug, props.kind)
+const catalog = useCatalog(props.tenantCode)
+const meta = computed(() => KINDS[props.kind])
+// Appointment slots only make sense in forms.
+const fieldTypes = computed(() => b.config.dataTypes.value.filter((t) => props.kind === 'form' || t.type_key !== SLOT_TYPE))
+
+// Preview dropdowns fed by lists use the admin options endpoint (filtered like the public form).
+function previewOptions(field, parentValue) {
+  const filter = field.depends_on_field_id ? { filter_field_id: field.match_field_id, filter_value: parentValue } : {}
+  return catalog.listOptions(field.list_id, filter)
+}
 const router = useRouter()
 const notify = useNotify()
 const confirm = useConfirm()
@@ -137,7 +158,7 @@ const loadError = ref('')
 async function load() {
   loadError.value = ''
   try {
-    await b.load()
+    await Promise.all([b.load(), catalog.refresh()])
   } catch (e) {
     loadError.value = e.message
   }
@@ -146,7 +167,8 @@ async function load() {
 async function save() {
   try {
     await b.save()
-    notify.success('Saved')
+    notify.success('Saved', props.kind === 'list' ? 'The list table is up to date.' : undefined)
+    if (props.kind === 'list') catalog.refresh()
     return true
   } catch (e) {
     notify.error('Not saved', e)

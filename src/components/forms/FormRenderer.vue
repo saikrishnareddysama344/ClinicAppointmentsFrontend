@@ -67,26 +67,37 @@
         </label>
       </div>
 
-      <template v-else-if="kind(field) === 'dropdown'">
-        <Select
-          v-if="optionSource(field) === staticSource"
-          :inputId="inputId(field)"
-          v-model="values[field.key]"
-          :options="optionList(field).filter(Boolean)"
-          :placeholder="field.placeholder || 'Select'"
-          :invalid="!!fieldError(field)"
-          showClear
-          fluid
-        />
-        <Select
-          v-else
-          :inputId="inputId(field)"
-          :options="[]"
-          :placeholder="`Options will load from ${optionSource(field)}`"
-          disabled
-          fluid
-        />
-      </template>
+      <Select
+        v-else-if="kind(field) === 'dropdown' && !isList(field)"
+        :inputId="inputId(field)"
+        v-model="values[field.key]"
+        :options="optionList(field).filter(Boolean)"
+        :placeholder="field.placeholder || 'Select'"
+        :invalid="!!fieldError(field)"
+        showClear
+        fluid
+      />
+
+      <!-- Options from a list: stored as the row id, shown by the list's display column. -->
+      <Select
+        v-else-if="kind(field) === 'dropdown'"
+        :inputId="inputId(field)"
+        v-model="values[field.key]"
+        :options="listOptions[field.key] || []"
+        optionLabel="label"
+        optionValue="id"
+        :filter="(listOptions[field.key] || []).length > 8"
+        :loading="!!loadingOptions[field.key]"
+        :disabled="!optionsLoader || !!waitingFor(field)"
+        :placeholder="!optionsLoader ? 'Options load from the list' : waitingFor(field)
+          ? `Choose ${waitingFor(field).display_label} first` : field.placeholder || 'Select'"
+        :invalid="!!fieldError(field)"
+        showClear
+        fluid
+      />
+
+      <SlotPicker v-else-if="kind(field) === 'slot'" v-model="values[field.key]" :field="field"
+                  :api="slotApi ? slotApi(field) : null" :refreshKey="refreshKey" />
 
       <small v-if="field.help_text" class="hint">{{ field.help_text }}</small>
       <small v-if="fieldError(field)" class="error">{{ fieldError(field) }}</small>
@@ -99,9 +110,10 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
+import SlotPicker from './SlotPicker.vue'
 import {
-  EMAIL_PATTERN, INPUT_KIND_BY_INPUT_TYPE, INPUT_KIND_BY_TYPE, PHONE_PATTERN, WHOLE_NUMBER_TYPES
+  EMAIL_PATTERN, INPUT_KIND_BY_INPUT_TYPE, INPUT_KIND_BY_TYPE, LIST_SOURCE, PHONE_PATTERN, WHOLE_NUMBER_TYPES
 } from '@/constants/fieldTypes'
 
 const props = defineProps({
@@ -115,7 +127,15 @@ const props = defineProps({
   submitLabel: { type: String, default: 'Submit' },
   // Errors from the server, keyed like the fields (field.key)
   externalErrors: { type: Object, default: () => ({}) },
-  submitting: { type: Boolean, default: false }
+  submitting: { type: Boolean, default: false },
+  // (field, parentValue) => Promise<[{id, label}]>, for dropdowns whose options come from a list
+  optionsLoader: { type: Function, default: null },
+  // (field) => { options(part, whereId), availability(params) }, for appointment slots
+  slotApi: { type: Function, default: null },
+  // Starting answers keyed like the fields, e.g. when editing a list row
+  initialValues: { type: Object, default: () => ({}) },
+  // Bump to reload appointment times (e.g. after "this window is full")
+  refreshKey: { type: Number, default: 0 }
 })
 
 const emit = defineEmits(['submitted'])
@@ -123,13 +143,50 @@ const emit = defineEmits(['submitted'])
 const values = reactive({})
 const errors = reactive({})
 
-watch(
-  () => props.fields.map((f) => f.key),
-  () => {
-    for (const key of Object.keys(values)) delete values[key]
-    for (const key of Object.keys(errors)) delete errors[key]
+watch(() => [props.fields.map((f) => f.key), props.initialValues], () => reset(), { immediate: true })
+
+// ---------- dropdowns fed by lists (optionally depending on an earlier dropdown) ----------
+const listOptions = reactive({})
+const loadingOptions = reactive({})
+
+const isList = (field) => optionSource(field) === LIST_SOURCE
+const parentOf = (field) => field.depends_on_field_id
+  ? props.fields.find((f) => f.id != null && f.id === field.depends_on_field_id) : null
+// The parent dropdown the patient still has to choose, if any.
+const waitingFor = (field) => {
+  const parent = parentOf(field)
+  return parent && isEmpty(values[parent.key]) ? parent : null
+}
+
+async function loadOptions(field) {
+  const parent = parentOf(field)
+  if (!props.optionsLoader || waitingFor(field)) {
+    listOptions[field.key] = []
+  } else {
+    loadingOptions[field.key] = true
+    try {
+      listOptions[field.key] = await props.optionsLoader(field, parent ? values[parent.key] : null)
+    } catch {
+      listOptions[field.key] = []
+    } finally {
+      loadingOptions[field.key] = false
+    }
   }
-)
+  // A choice that is no longer offered (the parent changed) is cleared.
+  if (!isEmpty(values[field.key]) && !listOptions[field.key].some((o) => o.id === values[field.key])) {
+    values[field.key] = null
+  }
+}
+
+// One entry per list dropdown: its key and its parent's current value. Reload what changed.
+const dependencies = computed(() => props.fields.filter(isList)
+  .map((f) => `${f.key}:${parentOf(f) ? values[parentOf(f).key] ?? '' : ''}`))
+watch(dependencies, (now, before = []) => {
+  for (const entry of now.filter((e) => !before.includes(e))) {
+    const field = props.fields.find((f) => f.key === entry.split(':')[0])
+    if (field) loadOptions(field)
+  }
+}, { immediate: true })
 
 function kind(field) {
   const key = String(field.data_type || '').toLowerCase()
@@ -158,10 +215,11 @@ function fieldError(field) {
   return errors[field.key] || props.externalErrors[field.key] || ''
 }
 
-// Clears all answers, e.g. after a successful submission.
+// Back to the starting answers, e.g. after a successful submission.
 function reset() {
   for (const key of Object.keys(values)) delete values[key]
   for (const key of Object.keys(errors)) delete errors[key]
+  Object.assign(values, props.initialValues)
 }
 
 defineExpose({ reset })
@@ -181,7 +239,11 @@ function validate() {
     const type = kind(field)
     let message = ''
 
-    if (field.is_mandatory && (type === 'boolean' ? value !== true : isEmpty(value))) {
+    if (type === 'slot' && props.slotApi && !value?.window_id) {
+      message = 'Choose a date and a time window.'
+    } else if (type === 'slot') {
+      message = ''
+    } else if (field.is_mandatory && (type === 'boolean' ? value !== true : isEmpty(value))) {
       message = type === 'boolean' ? 'Please tick this box.' : 'This field is required.'
     } else if (!isEmpty(value) && type === 'email' && !EMAIL_PATTERN.test(value)) {
       message = 'Enter a valid email address.'

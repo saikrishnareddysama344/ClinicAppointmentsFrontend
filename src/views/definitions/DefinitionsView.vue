@@ -1,38 +1,32 @@
 <template>
   <main class="page">
-    <nav class="crumbs" aria-label="Breadcrumb">
-      <router-link :to="{ name: ROUTES.TENANTS }">Tenants</router-link>
-      <i class="pi pi-angle-right" aria-hidden="true" />
-      <span>{{ tenant?.name || '…' }}</span>
-    </nav>
+    <TenantNav :tenantCode="tenantCode" />
 
     <div class="page-head">
       <div>
-        <h1>{{ tenant?.name || 'Forms' }}</h1>
-        <p v-if="tenant" class="sub">
-          Code <span class="mono">{{ tenant.code }}</span> · Schema <span class="mono">{{ tenant.schema_name }}</span>
-        </p>
+        <h1>{{ meta.plural }}</h1>
+        <p class="sub">{{ intro }}</p>
       </div>
-      <Button label="New form" icon="pi pi-plus" :disabled="!tenant" @click="openCreate" />
+      <Button :label="`New ${label}`" icon="pi pi-plus" @click="openCreate" />
     </div>
 
     <div class="panel">
-      <DataTable :value="forms" :loading="loading" dataKey="id" rowHover
+      <DataTable :value="items" :loading="loading" dataKey="id" rowHover
                  :rowClass="() => 'clickable-row'" @row-click="(e) => openBuilder(e.data)">
         <template #empty>
           <div class="empty">
             <i class="pi pi-file-edit" aria-hidden="true" />
-            No forms yet. Create one, for example "Appointment booking".
+            No {{ label }}s yet. {{ example }}
           </div>
         </template>
-        <Column field="display_name" header="Form">
+        <Column field="display_name" :header="meta.label">
           <template #body="{ data }">
             <strong>{{ data.display_name }}</strong>
             <div class="mono muted">{{ data.slug }}</div>
           </template>
         </Column>
         <Column field="field_count" header="Fields" style="width: 80px" />
-        <Column header="Status" style="width: 200px">
+        <Column v-if="kind === 'form'" header="Status" style="width: 200px">
           <template #body="{ data }">
             <FormStatusTag :status="data.status" />
             <div v-if="data.status !== FORM_STATUS.DRAFT && data.accepting_submissions !== FLAG_YES"
@@ -47,8 +41,8 @@
             <div class="actions" @click.stop>
               <Button icon="pi pi-pencil" text rounded aria-label="Open builder" v-tooltip.top="'Open builder'"
                       @click="openBuilder(data)" />
-              <Button v-if="data.status !== FORM_STATUS.DRAFT" icon="pi pi-inbox" text rounded
-                      aria-label="Submissions" v-tooltip.top="'Submissions'" @click="openSubmissions(data)" />
+              <Button v-if="data.status !== FORM_STATUS.DRAFT" :icon="kind === 'form' ? 'pi pi-inbox' : 'pi pi-table'"
+                      text rounded :aria-label="rowsLabel" v-tooltip.top="rowsLabel" @click="openRows(data)" />
               <Button v-if="data.status === FORM_STATUS.DRAFT" icon="pi pi-trash" text rounded severity="danger"
                       aria-label="Delete draft" v-tooltip.top="'Delete draft'" @click="confirmDelete(data)" />
             </div>
@@ -57,11 +51,11 @@
       </DataTable>
     </div>
 
-    <Dialog v-model:visible="showCreate" modal header="New form" :style="{ width: '460px' }">
+    <Dialog v-model:visible="showCreate" modal :header="`New ${label}`" :style="{ width: '460px' }">
       <form class="form-grid" @submit.prevent="createForm">
         <div class="field">
-          <label for="form-name">Form name<span class="required-star">*</span></label>
-          <InputText id="form-name" v-model="draft.name" fluid autofocus placeholder="Appointment booking"
+          <label for="form-name">{{ meta.label }} name<span class="required-star">*</span></label>
+          <InputText id="form-name" v-model="draft.name" fluid autofocus :placeholder="kind === 'form' ? 'Appointment booking' : 'Doctors'"
                      @input="syncSlug" />
           <small v-if="errors.display_name" class="error">{{ errors.display_name }}</small>
         </div>
@@ -69,7 +63,7 @@
           <label for="form-slug">Link name</label>
           <InputText id="form-slug" v-model="draft.slug" fluid class="mono" placeholder="appointment-booking"
                      @input="slugEdited = true" />
-          <small class="hint">Used in the form's links: /f/{{ tenantCode }}/{{ draft.slug || '…' }}. It cannot change later.</small>
+          <small class="hint">Used in links<template v-if="kind === 'form'">: /f/{{ tenantCode }}/{{ draft.slug || '…' }}</template>. It cannot change later.</small>
           <small v-if="errors.slug" class="error">{{ errors.slug }}</small>
         </div>
       </form>
@@ -83,26 +77,38 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useConfirm } from 'primevue/useconfirm'
 import FormStatusTag from '@/components/common/FormStatusTag.vue'
+import TenantNav from '@/components/layout/TenantNav.vue'
 import { useNotify } from '@/composables/useNotify'
 import { FLAG_YES, FORM_STATUS } from '@/constants/formStatus'
-import { ROUTES } from '@/router'
-import { formsApi, tenantsApi } from '@/services/api'
+import { KIND_ROUTES } from '@/router'
+import { definitionApis, KINDS } from '@/services/api'
 import { formatEpoch, tenantCodeFromName } from '@/utils/format'
 
+// Forms and lists: the same page, for either kind.
 const props = defineProps({
-  tenantCode: { type: String, required: true }
+  tenantCode: { type: String, required: true },
+  kind: { type: String, default: 'form' }
 })
 
 const router = useRouter()
 const notify = useNotify()
 const confirm = useConfirm()
 
-const tenant = ref(null)
-const forms = ref([])
+const meta = computed(() => KINDS[props.kind])
+const label = computed(() => meta.value.label.toLowerCase())
+const api = computed(() => definitionApis[props.kind])
+const rowsLabel = computed(() => (props.kind === 'form' ? 'Submissions' : 'Rows'))
+const intro = computed(() => props.kind === 'form'
+  ? 'Forms collect answers, for example appointment requests. Publish one to get its public link.'
+  : 'Lists hold your own data, for example branches, doctors or services. Form dropdowns can use them.')
+const example = computed(() => props.kind === 'form' ? 'Create one, for example "Appointment booking".'
+  : 'Create one, for example "Branches" or "Doctors".')
+
+const items = ref([])
 const loading = ref(false)
 const showCreate = ref(false)
 const saving = ref(false)
@@ -117,14 +123,9 @@ function syncSlug() {
 async function load() {
   loading.value = true
   try {
-    const [tenantResult, formsResult] = await Promise.all([
-      tenantsApi.get(props.tenantCode),
-      formsApi.listForTenant(props.tenantCode)
-    ])
-    tenant.value = tenantResult.tenant
-    forms.value = formsResult.forms
+    items.value = (await api.value.list(props.tenantCode))[`${props.kind}s`]
   } catch (e) {
-    notify.error('Could not load forms', e)
+    notify.error(`Could not load ${label.value}s`, e)
   } finally {
     loading.value = false
   }
@@ -137,39 +138,36 @@ function openCreate() {
   showCreate.value = true
 }
 
+const go = (target, item) => router.push({ name: KIND_ROUTES[props.kind][target],
+  params: { tenantCode: props.tenantCode, slug: item.slug } })
+const openBuilder = (item) => go('builder', item)
+const openRows = (item) => go('rows', item)
+
 async function createForm() {
   Object.assign(errors, { display_name: '', slug: '' })
   saving.value = true
   try {
-    const { form } = await formsApi.create(props.tenantCode, { display_name: draft.name, slug: draft.slug })
+    const result = await api.value.create(props.tenantCode, { display_name: draft.name, slug: draft.slug })
     showCreate.value = false
-    router.push({ name: ROUTES.FORM_BUILDER, params: { tenantCode: props.tenantCode, formSlug: form.slug } })
+    openBuilder(result[props.kind])
   } catch (e) {
     if (e.data?.errors) Object.assign(errors, e.data.errors)
-    else notify.error('Could not create form', e)
+    else notify.error(`Could not create ${label.value}`, e)
   } finally {
     saving.value = false
   }
 }
 
-function openBuilder(form) {
-  router.push({ name: ROUTES.FORM_BUILDER, params: { tenantCode: props.tenantCode, formSlug: form.slug } })
-}
-
-function openSubmissions(form) {
-  router.push({ name: ROUTES.SUBMISSIONS, params: { tenantCode: props.tenantCode, formSlug: form.slug } })
-}
-
-function confirmDelete(form) {
+function confirmDelete(item) {
   confirm.require({
-    header: 'Delete draft form?',
-    message: `"${form.display_name}" and its fields will be removed. This cannot be undone.`,
+    header: `Delete draft ${label.value}?`,
+    message: `"${item.display_name}" and its fields will be removed. This cannot be undone.`,
     icon: 'pi pi-exclamation-triangle',
     rejectProps: { label: 'Cancel', severity: 'secondary', text: true },
     acceptProps: { label: 'Delete', severity: 'danger' },
     accept: async () => {
       try {
-        await formsApi.remove(props.tenantCode, form.slug)
+        await api.value.remove(props.tenantCode, item.slug)
         notify.success('Draft deleted')
         await load()
       } catch (e) {
@@ -179,7 +177,7 @@ function confirmDelete(form) {
   })
 }
 
-onMounted(load)
+watch(() => [props.tenantCode, props.kind], load, { immediate: true })
 </script>
 
 <style scoped>

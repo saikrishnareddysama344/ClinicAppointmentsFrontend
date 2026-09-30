@@ -27,6 +27,7 @@
           </div>
           <div class="meta">
             <span>{{ typeName(field.data_type) }}</span>
+            <span v-if="field.is_display" class="display-badge"><i class="pi pi-star-fill" aria-hidden="true" /> display</span>
             <span v-if="field.column_name" v-tooltip.top="'Published column: type is locked'">
               <i class="pi pi-lock" aria-hidden="true" /> {{ field.column_name }}
             </span>
@@ -89,5 +90,9 @@ const addMenuItems = computed(() =>
 
 .error-badge {
   color: var(--p-red-500);
+}
+
+.display-badge {
+  color: var(--p-primary-color);
 }
 </style>

@@ -12,7 +12,8 @@ export const TYPE_ICONS = {
   boolean: 'pi pi-check-square',
   dropdown: 'pi pi-list',
   email: 'pi pi-envelope',
-  phone: 'pi pi-phone'
+  phone: 'pi pi-phone',
+  slot: 'pi pi-calendar-clock'
 }
 export const DEFAULT_TYPE_ICON = 'pi pi-circle'
 
@@ -20,7 +21,7 @@ export const DEFAULT_TYPE_ICON = 'pi pi-circle'
 export const INPUT_KIND_BY_TYPE = {
   string: 'text', varchar: 'text', email: 'email', phone: 'phone', text: 'textarea', textarea: 'textarea',
   number: 'number', decimal: 'number', integer: 'number', bigint: 'number',
-  date: 'date', time: 'time', boolean: 'boolean', dropdown: 'dropdown'
+  date: 'date', time: 'time', boolean: 'boolean', dropdown: 'dropdown', slot: 'slot'
 }
 
 // ...or, for unknown keys, for the data type's input_field_type.
@@ -32,6 +33,8 @@ export const INPUT_KIND_BY_INPUT_TYPE = {
 export const WHOLE_NUMBER_TYPES = ['integer', 'bigint']
 
 export const DROPDOWN_TYPE = 'dropdown'
+export const SLOT_TYPE = 'slot'
+export const LIST_SOURCE = 'list'
 export const NEW_DROPDOWN_OPTIONS = ['Option 1', 'Option 2']
 
 // Client-side format checks used by the preview.

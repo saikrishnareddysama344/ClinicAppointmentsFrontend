@@ -36,3 +36,35 @@ export function toApiValue(dataType, value) {
   }
   return value
 }
+
+// A stored value as text for tables (dates localised, booleans as Yes/No, empty as a dash).
+export function displayValue(dataType, value) {
+  if (value === null || value === undefined || value === '') return '—'
+  if (dataType === 'boolean') return value ? 'Yes' : 'No'
+  if (dataType === 'datetime') {
+    return new Date(value).toLocaleString(appConfig.locale, {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    })
+  }
+  if (dataType === 'date') {
+    return new Date(`${value}T00:00:00`).toLocaleDateString(appConfig.locale, {
+      day: '2-digit', month: 'short', year: 'numeric'
+    })
+  }
+  if (dataType === 'time') return String(value).slice(0, 5)
+  return value
+}
+
+// A field from the API (public form, or a definition's fields) in the shape FormRenderer uses.
+export function rendererField(f) {
+  const o = f.options_config || {}
+  return {
+    key: String(f.id), id: f.id, display_label: f.display_label, data_type: String(f.data_type).toLowerCase(),
+    is_mandatory: f.is_mandatory === true || f.is_mandatory === 'Y', max_length: f.max_length,
+    placeholder: f.placeholder || '', help_text: f.help_text || '',
+    source: f.source || o.source || 'static', options: f.options || o.options || [],
+    list_id: o.list_id ?? null, match_field_id: o.match_field_id ?? null,
+    depends_on_field_id: f.depends_on_field_id ?? o.depends_on_field_id ?? null,
+    slot: f.slot || null
+  }
+}

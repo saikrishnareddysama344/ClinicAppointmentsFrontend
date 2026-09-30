@@ -27,6 +27,12 @@
           <i class="pi pi-check-circle" aria-hidden="true" />
           <h2>Thank you!</h2>
           <p>{{ successMessage }}</p>
+          <div v-if="booking" class="token-card">
+            <span class="token-label">Your token</span>
+            <span class="token-no">{{ booking.token_no }}</span>
+            <span>{{ [booking.who, booking.where].filter(Boolean).join(' · ') }}</span>
+            <span>{{ displayValue('date', booking.date) }}, {{ booking.start }}–{{ booking.end }}</span>
+          </div>
           <Button label="Submit another response" severity="secondary" outlined @click="startAgain" />
         </div>
 
@@ -47,6 +53,9 @@
             :defaultPhoneLength="form.limits.default_phone_length"
             :externalErrors="serverErrors"
             :submitting="submitting"
+            :optionsLoader="loadOptions"
+            :slotApi="slotApi"
+            :refreshKey="refreshKey"
             submitLabel="Submit"
             @submitted="submit"
           />
@@ -60,7 +69,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import FormRenderer from '@/components/forms/FormRenderer.vue'
 import { publicApi } from '@/services/api'
-import { toApiValue } from '@/utils/format'
+import { displayValue, rendererField, toApiValue } from '@/utils/format'
 
 const props = defineProps({
   tenantCode: { type: String, required: true },
@@ -77,19 +86,19 @@ const honeypot = ref('')
 const serverErrors = reactive({})
 const renderer = ref(null)
 
-const fields = computed(() =>
-  (form.value?.fields || []).map((f) => ({
-    key: String(f.id),
-    display_label: f.display_label,
-    data_type: f.data_type,
-    is_mandatory: f.is_mandatory,
-    max_length: f.max_length,
-    placeholder: f.placeholder || '',
-    help_text: f.help_text || '',
-    source: form.value.static_source,
-    options: f.options || []
-  }))
-)
+const booking = ref(null)
+const refreshKey = ref(0)   // bumped after a failed booking, so the times reload
+
+const fields = computed(() => (form.value?.fields || []).map(rendererField))
+
+// Dropdowns fed by a list, and the appointment picker, load their choices from the API.
+const loadOptions = async (field, parentValue) =>
+  (await publicApi.options(props.tenantCode, props.formSlug, field.id, { depends_value: parentValue })).options
+const slotApi = (field) => ({
+  options: async (part, whereId) =>
+    (await publicApi.options(props.tenantCode, props.formSlug, field.id, { part, where_id: whereId })).options,
+  availability: (params) => publicApi.availability(props.tenantCode, props.formSlug, field.id, params)
+})
 
 function clearServerErrors() {
   for (const key of Object.keys(serverErrors)) delete serverErrors[key]
@@ -123,11 +132,13 @@ async function submit(answers) {
       [form.value.honeypot_field]: honeypot.value
     })
     successMessage.value = result.message
+    booking.value = result.booking || null
     state.value = 'done'
   } catch (e) {
     Object.assign(serverErrors, e.data?.field_errors || {})
     formError.value = e.message
     if (e.httpStatus === 403) form.value = { ...form.value, accepting_submissions: false }
+    if (e.httpStatus === 409) refreshKey.value++
   } finally {
     submitting.value = false
   }
@@ -201,6 +212,31 @@ onMounted(load)
 
 .mb {
   margin-bottom: 1rem;
+}
+
+.token-card {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0.5rem 0 1.25rem;
+  padding: 1rem 1.5rem;
+  border: 1px solid var(--p-primary-color);
+  border-radius: 12px;
+  color: var(--p-text-color);
+}
+
+.token-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--p-text-muted-color);
+}
+
+.token-no {
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: var(--p-primary-color);
+  line-height: 1.1;
 }
 
 /* Honeypot: off-screen, not display:none (some bots skip hidden inputs). */

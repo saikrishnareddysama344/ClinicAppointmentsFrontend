@@ -37,6 +37,10 @@ export function useBuilderConfig() {
     return (builder.value?.length_types || []).includes(typeKey)
   }
 
+  function isDisplayType(typeKey) {
+    return (builder.value?.display_types || []).includes(typeKey)
+  }
+
   function isReserved(columnName) {
     return (builder.value?.reserved_columns || []).includes(columnName)
   }
@@ -55,6 +59,6 @@ export function useBuilderConfig() {
 
   return {
     builder, dataTypes, limits, staticSource, dropdownSources, inputTypes,
-    load, isLengthType, isReserved, typeName, columnPreview, defaultLength
+    load, isLengthType, isDisplayType, isReserved, typeName, columnPreview, defaultLength
   }
 }

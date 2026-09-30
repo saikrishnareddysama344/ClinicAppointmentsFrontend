@@ -20,6 +20,7 @@ import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import Message from 'primevue/message'
 import Select from 'primevue/select'
+import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import Toast from 'primevue/toast'
@@ -32,7 +33,7 @@ import './assets/styles/main.css'
 
 const primeComponents = {
   Button, Checkbox, Column, ConfirmDialog, DataTable, DatePicker, Dialog, InputNumber,
-  InputText, Menu, Message, Select, Tag, Textarea, Toast, ToggleSwitch
+  InputText, Menu, Message, Select, SelectButton, Tag, Textarea, Toast, ToggleSwitch
 }
 
 document.title = appConfig.title

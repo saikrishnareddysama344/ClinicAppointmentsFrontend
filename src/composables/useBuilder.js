@@ -1,16 +1,17 @@
-// State and actions for editing one form. The view only handles layout,
-// notifications and confirmations.
+// State and actions for editing one form or list. The view only handles layout,
+// notifications and confirmations. A list is published by the backend on every save.
 import { computed, reactive, ref } from 'vue'
-import { formsApi } from '@/services/api'
-import { DROPDOWN_TYPE, NEW_DROPDOWN_OPTIONS } from '@/constants/fieldTypes'
+import { definitionApis } from '@/services/api'
+import { DROPDOWN_TYPE, LIST_SOURCE, NEW_DROPDOWN_OPTIONS, SLOT_TYPE } from '@/constants/fieldTypes'
 import { FLAG_YES, FORM_STATUS } from '@/constants/formStatus'
 import { useBuilderConfig } from './useBuilderConfig'
 
 let keySeed = 0
 const nextKey = () => `k${++keySeed}`
 
-export function useFormBuilder(tenantCode, formSlug) {
+export function useBuilder(tenantCode, slug, kind = 'form') {
   const config = useBuilderConfig()
+  const api = definitionApis[kind]
 
   const form = ref(null)
   const formName = ref('')
@@ -38,8 +39,31 @@ export function useFormBuilder(tenantCode, formSlug) {
       placeholder: apiField.placeholder || '',
       help_text: apiField.help_text || '',
       source: options.source || config.staticSource.value,
-      options: Array.isArray(options.options) ? [...options.options] : []
+      options: Array.isArray(options.options) ? [...options.options] : [],
+      is_display: !!apiField.is_display,
+      // dropdown from a list (optionally depending on an earlier dropdown)
+      list_id: options.list_id ?? null,
+      depends_on_field_id: options.depends_on_field_id ?? null,
+      match_field_id: options.match_field_id ?? null,
+      // appointment slot
+      schedule_id: options.schedule_id ?? null,
+      contact_field_id: options.contact_field_id ?? null
     }
+  }
+
+  function optionsConfig(field) {
+    if (field.data_type === SLOT_TYPE) {
+      return { schedule_id: field.schedule_id, contact_field_id: field.contact_field_id || null }
+    }
+    if (field.data_type !== DROPDOWN_TYPE) return null
+    if (field.source === LIST_SOURCE) {
+      const config = { source: LIST_SOURCE, list_id: field.list_id }
+      if (field.depends_on_field_id) {
+        Object.assign(config, { depends_on_field_id: field.depends_on_field_id, match_field_id: field.match_field_id })
+      }
+      return config
+    }
+    return { source: field.source, options: field.options.map((o) => o.trim()).filter(Boolean) }
   }
 
   function toPayload(field) {
@@ -50,14 +74,10 @@ export function useFormBuilder(tenantCode, formSlug) {
       max_length: config.isLengthType(field.data_type) ? field.max_length ?? null : null,
       placeholder: field.placeholder.trim() || null,
       help_text: field.help_text.trim() || null,
-      options_config: null
+      options_config: optionsConfig(field)
     }
     if (field.id) payload.id = field.id
-    if (field.data_type === DROPDOWN_TYPE) {
-      payload.options_config = field.source === config.staticSource.value
-        ? { source: field.source, options: field.options.map((o) => o.trim()).filter(Boolean) }
-        : { source: field.source }
-    }
+    if (kind === 'list') payload.is_display = field.is_display
     return payload
   }
 
@@ -112,7 +132,7 @@ export function useFormBuilder(tenantCode, formSlug) {
     loading.value = true
     try {
       await config.load()
-      applyForm((await formsApi.get(tenantCode, formSlug)).form)
+      applyForm((await api.get(tenantCode, slug))[kind])
     } finally {
       loading.value = false
     }
@@ -123,7 +143,7 @@ export function useFormBuilder(tenantCode, formSlug) {
     clearErrors()
     saving.value = true
     try {
-      applyForm((await formsApi.save(tenantCode, formSlug, payload.value)).form)
+      applyForm((await api.save(tenantCode, slug, payload.value))[kind])
       return true
     } catch (e) {
       for (const [index, messages] of Object.entries(e.data?.field_errors || {})) {
@@ -142,8 +162,8 @@ export function useFormBuilder(tenantCode, formSlug) {
   async function publish() {
     publishing.value = true
     try {
-      const result = await formsApi.publish(tenantCode, formSlug)
-      applyForm((await formsApi.get(tenantCode, formSlug)).form)
+      const result = await api.publish(tenantCode, slug)
+      applyForm((await api.get(tenantCode, slug))[kind])
       return result
     } finally {
       publishing.value = false
@@ -154,9 +174,11 @@ export function useFormBuilder(tenantCode, formSlug) {
 
   function blankField(type) {
     return {
-      key: nextKey(), id: null, column_name: null, display_label: '', data_type: type, is_mandatory: false,
+      key: nextKey(), id: null, column_name: null, display_label: '', data_type: type, is_mandatory: type === SLOT_TYPE,
       max_length: null, placeholder: '', help_text: '', source: config.staticSource.value,
-      options: type === DROPDOWN_TYPE ? [...NEW_DROPDOWN_OPTIONS] : []
+      options: type === DROPDOWN_TYPE ? [...NEW_DROPDOWN_OPTIONS] : [],
+      is_display: kind === 'list' && !fields.value.some((f) => f.is_display) && config.isDisplayType(type),
+      list_id: null, depends_on_field_id: null, match_field_id: null, schedule_id: null, contact_field_id: null
     }
   }
 
@@ -177,7 +199,7 @@ export function useFormBuilder(tenantCode, formSlug) {
   function duplicate(index) {
     const source = fields.value[index]
     const copy = { ...source, key: nextKey(), id: null, column_name: null, options: [...source.options],
-      display_label: `${source.display_label} copy` }
+      display_label: `${source.display_label} copy`, is_display: false }
     fields.value.splice(index + 1, 0, copy)
     selectedKey.value = copy.key
   }
@@ -195,16 +217,23 @@ export function useFormBuilder(tenantCode, formSlug) {
       field.options = [...NEW_DROPDOWN_OPTIONS]
     }
     if (!config.isLengthType(field.data_type)) field.max_length = null
+    if (field.data_type === SLOT_TYPE) field.is_mandatory = true
+    if (!config.isDisplayType(field.data_type)) field.is_display = false
+  }
+
+  // Lists have exactly one display column: choosing one clears the others.
+  function setDisplay(field) {
+    for (const f of fields.value) f.is_display = f === field
   }
 
   async function setAccepting(accepting) {
-    const result = await formsApi.updateShare(tenantCode, formSlug, { accepting_submissions: accepting })
-    form.value = { ...form.value, accepting_submissions: result.form.accepting_submissions }
+    const result = await api.updateShare(tenantCode, slug, { accepting_submissions: accepting })
+    form.value = { ...form.value, accepting_submissions: result[kind].accepting_submissions }
   }
 
   return {
-    config, form, formName, fields, selectedKey, selected, fieldErrors, generalErrors,
+    kind, config, form, formName, fields, selectedKey, selected, fieldErrors, generalErrors,
     loading, saving, publishing, dirty, isDraft, canPublish,
-    load, save, publish, setAccepting, addField, move, duplicate, remove, onTypeChange, nameProblem
+    load, save, publish, setAccepting, addField, move, duplicate, remove, onTypeChange, setDisplay, nameProblem
   }
 }
