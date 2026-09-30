@@ -15,7 +15,10 @@
     <div class="page-head">
       <div>
         <h1>Submissions</h1>
-        <p class="sub">{{ total }} response{{ total === 1 ? '' : 's' }} · newest first</p>
+        <p class="sub">
+          <template v-if="loaded">{{ total }} response{{ total === 1 ? '' : 's' }} · newest first</template>
+          <template v-else>Loading responses…</template>
+        </p>
       </div>
       <div class="actions">
         <Button label="Refresh" icon="pi pi-refresh" severity="secondary" outlined :loading="loading" @click="load" />
@@ -39,7 +42,7 @@
         @page="onPage"
       >
         <template #empty>
-          <div class="empty">
+          <div v-if="loaded" class="empty">
             <i class="pi pi-inbox" aria-hidden="true" />
             No submissions yet. Share the form's public link to start collecting responses.
           </div>
@@ -57,7 +60,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useNotify } from '@/composables/useNotify'
 import { appConfig } from '@/config/env'
 import { ROUTES } from '@/router'
@@ -76,7 +79,9 @@ const rows = ref([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = ref(25)
-const loading = ref(false)
+// true from the start, so the table shows a spinner instead of "No submissions yet"
+const loading = ref(true)
+const loaded = ref(false) // becomes true after the first successful load
 
 const csvUrl = computed(() => submissionsApi.csvUrl(props.tenantCode, props.formSlug))
 
@@ -105,6 +110,7 @@ async function load() {
     rows.value = result.rows
     total.value = result.total
     pageSize.value = result.page_size
+    loaded.value = true
   } catch (e) {
     notify.error('Could not load submissions', e)
   } finally {
@@ -118,12 +124,21 @@ function onPage(event) {
   load()
 }
 
-onMounted(async () => {
+async function loadForm() {
   try {
     form.value = (await formsApi.get(props.tenantCode, props.formSlug)).form
   } catch {
     // breadcrumbs fall back to the codes
   }
+}
+
+// Submissions and the form name (for the breadcrumbs) load in parallel, so the table
+// never waits for the breadcrumbs. Runs again if the URL switches to another form.
+watch(() => [props.tenantCode, props.formSlug], () => {
+  page.value = 1
+  loaded.value = false
+  form.value = null
+  loadForm()
   load()
-})
+}, { immediate: true })
 </script>
