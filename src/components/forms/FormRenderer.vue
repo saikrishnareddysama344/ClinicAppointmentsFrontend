@@ -87,10 +87,10 @@
         optionLabel="label"
         optionValue="id"
         :filter="(listOptions[field.key] || []).length > 8"
-        :loading="!!loadingOptions[field.key]"
         :disabled="!optionsLoader || !!waitingFor(field)"
         :placeholder="!optionsLoader ? 'Options load from the list' : waitingFor(field)
-          ? `Choose ${waitingFor(field).display_label} first` : field.placeholder || 'Select'"
+          ? `Choose ${waitingFor(field).display_label} first`
+          : loadingOptions[field.key] ? 'Loading…' : field.placeholder || 'Select'"
         :invalid="!!fieldError(field)"
         showClear
         fluid

@@ -5,10 +5,10 @@
     <template v-else>
       <div class="slot-row">
         <Select v-if="info.where" v-model="pick.where_id" :options="wheres" optionLabel="label" optionValue="id"
-                :placeholder="`Choose ${info.where}`" :ariaLabel="info.where" :loading="busy.where" fluid
+                :placeholder="busy.where ? 'Loading…' : `Choose ${info.where}`" :ariaLabel="info.where" fluid
                 @change="onWhere" />
         <Select v-model="pick.who_id" :options="whos" optionLabel="label" optionValue="id"
-                :placeholder="`Choose ${info.who || 'who'}`" :ariaLabel="info.who" :loading="busy.who"
+                :placeholder="busy.who ? 'Loading…' : `Choose ${info.who || 'who'}`" :ariaLabel="info.who"
                 :disabled="!!info.where && !pick.where_id" fluid @change="loadWindows" />
         <DatePicker v-model="pick.day" :minDate="range.first" :maxDate="range.last" dateFormat="dd/mm/yy"
                     placeholder="Date" ariaLabel="Date" showIcon :disabled="!pick.who_id" fluid
