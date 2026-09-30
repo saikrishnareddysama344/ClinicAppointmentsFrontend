@@ -1,7 +1,6 @@
 // All backend endpoints, grouped by area. Views never build URLs themselves.
 // Tenants are addressed by their code; forms, lists and schedules by their link name (slug).
-import { request } from './http'
-import { appConfig } from '@/config/env'
+import { download, request } from './http'
 
 const enc = encodeURIComponent
 
@@ -14,8 +13,42 @@ export const qs = (params = {}) => {
 export const tenantsApi = {
   list: () => request('GET', '/v1/tenants'),
   get: (tenantCode) => request('GET', `/v1/tenants/${enc(tenantCode)}`),
+  // payload: {name, code, admin: {name, email, password}} (the clinic's first Clinic admin)
   create: (payload) => request('POST', '/v1/tenants', payload)
 }
+
+export const authApi = {
+  login: (payload) => request('POST', '/v1/auth/login', payload),
+  logout: () => request('POST', '/v1/auth/logout'),
+  me: () => request('GET', '/v1/auth/me'),
+  changePassword: (payload) => request('PUT', '/v1/auth/password', payload),
+  sessions: () => request('GET', '/v1/auth/sessions'),
+  endSession: (id) => request('DELETE', `/v1/auth/sessions/${id}`)
+}
+
+// Users and roles of a clinic.
+export const usersApi = (() => {
+  const base = (t) => `/v1/tenants/${enc(t)}/users`
+  return {
+    list: (t) => request('GET', base(t)),
+    create: (t, payload) => request('POST', base(t), payload),
+    update: (t, id, payload) => request('PUT', `${base(t)}/${id}`, payload),
+    resetPassword: (t, id, password) => request('PUT', `${base(t)}/${id}/password`, { password }),
+    unlock: (t, id) => request('POST', `${base(t)}/${id}/unlock`),
+    sessions: (t, id) => request('GET', `${base(t)}/${id}/sessions`),
+    endSession: (t, id, sessionId) => request('DELETE', `${base(t)}/${id}/sessions/${sessionId}`)
+  }
+})()
+
+export const rolesApi = (() => {
+  const base = (t) => `/v1/tenants/${enc(t)}/roles`
+  return {
+    list: (t) => request('GET', base(t)),
+    create: (t, payload) => request('POST', base(t), payload),
+    update: (t, id, payload) => request('PUT', `${base(t)}/${id}`, payload),
+    remove: (t, id) => request('DELETE', `${base(t)}/${id}`)
+  }
+})()
 
 // Forms and lists share the same endpoints; only the path and the name of their rows differ.
 export const KINDS = Object.freeze({
@@ -40,8 +73,8 @@ function definitionsApi(kind) {
     updateRow: (t, slug, id, values) => request('PUT', `${one(t, slug)}/${rows}/${id}`, { values }),
     setRowStatus: (t, slug, id, active) => request('PUT', `${one(t, slug)}/${rows}/${id}/status`, { active }),
     options: (t, slug, params) => request('GET', `${one(t, slug)}/options${qs(params)}`),
-    // Plain link: the browser downloads the file itself.
-    csvUrl: (t, slug) => `${appConfig.apiBaseUrl}${one(t, slug)}/${rows}.csv`
+    // Downloaded with the login token (a plain link cannot send it).
+    downloadCsv: (t, slug) => download(`${one(t, slug)}/${rows}.csv`, `${slug}-${rows}.csv`)
   }
 }
 
@@ -84,5 +117,6 @@ export const publicApi = (() => {
 export const metaApi = {
   builder: () => request('GET', '/v1/meta/builder'),
   dataTypes: () => request('GET', '/v1/getDataTypes'),
+  permissions: () => request('GET', '/v1/meta/permissions'),
   health: () => request('GET', '/v1/health')
 }

@@ -303,3 +303,49 @@ body {
 .clickable-row {
   cursor: pointer;
 }
+
+/* Login and password pages */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 400px;
+  padding: 1.75rem;
+}
+
+.auth-card h1 {
+  margin: 0 0 1rem;
+  font-size: 1.35rem;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: var(--p-primary-color);
+  margin-bottom: 1.25rem;
+}
+
+.mb {
+  margin-bottom: 1rem;
+}
+
+.mt {
+  margin-top: 0.75rem;
+}
+
+.section-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--p-content-border-color);
+}

@@ -1,6 +1,6 @@
 <template>
   <header class="app-header">
-    <router-link :to="{ name: ROUTES.TENANTS }" class="brand">
+    <router-link :to="home()" class="brand">
       <i class="pi pi-th-large" aria-hidden="true" />
       {{ appConfig.title }}
     </router-link>
@@ -9,14 +9,30 @@
     <span class="api-status" :class="apiState" v-tooltip.bottom="apiTooltip">
       <i class="pi pi-circle-fill" aria-hidden="true" /> API
     </span>
+    <template v-if="user">
+      <Button :label="user.name" icon="pi pi-user" severity="secondary" text size="small"
+              aria-haspopup="true" aria-controls="user-menu" @click="(e) => menu.toggle(e)" />
+      <Menu id="user-menu" ref="menu" :model="menuItems" popup />
+    </template>
   </header>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { appConfig } from '@/config/env'
-import { ROUTES } from '@/router'
+import { home, ROUTES } from '@/router'
 import { metaApi } from '@/services/api'
+import { isPlatformAdmin, logout, user } from '@/services/auth'
+import router from '@/router'
+
+const menu = ref(null)
+const menuItems = computed(() => [
+  { label: user.value?.email, disabled: true, class: 'muted' },
+  ...(isPlatformAdmin.value ? [{ label: 'Platform admin', icon: 'pi pi-star', disabled: true }] : []),
+  { separator: true },
+  { label: 'Change password', icon: 'pi pi-key', command: () => router.push({ name: ROUTES.PASSWORD }) },
+  { label: 'Log out', icon: 'pi pi-sign-out', command: () => logout() }
+])
 
 const apiState = ref('checking')
 

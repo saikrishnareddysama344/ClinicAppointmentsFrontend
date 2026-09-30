@@ -19,9 +19,9 @@
                         :allowEmpty="false" aria-label="Show" @change="reload" />
         </template>
         <Button label="Refresh" icon="pi pi-refresh" severity="secondary" outlined :loading="loading" @click="load" />
-        <Button label="Download CSV" icon="pi pi-download" severity="secondary" as="a" :href="csvUrl"
-                :disabled="!total" download />
-        <Button v-if="isList" label="Add row" icon="pi pi-plus" :disabled="!definition" @click="openEditor(null)" />
+        <Button v-if="canExport" label="Download CSV" icon="pi pi-download" severity="secondary"
+                :disabled="!total" :loading="downloading" @click="downloadCsv" />
+        <Button v-if="isList && canEdit" label="Add row" icon="pi pi-plus" :disabled="!definition" @click="openEditor(null)" />
       </div>
     </div>
 
@@ -43,7 +43,7 @@
             </span>
           </template>
         </Column>
-        <Column v-if="isList" style="width: 110px">
+        <Column v-if="isList && canEdit" style="width: 110px">
           <template #body="{ data }">
             <div class="actions">
               <Button icon="pi pi-pencil" text rounded aria-label="Edit" v-tooltip.top="'Edit'" @click="openEditor(data)" />
@@ -77,6 +77,7 @@ import { useCatalog } from '@/composables/useCatalog'
 import { useNotify } from '@/composables/useNotify'
 import { KIND_ROUTES } from '@/router'
 import { definitionApis } from '@/services/api'
+import { can } from '@/services/auth'
 import { displayValue, rendererField, toApiValue } from '@/utils/format'
 
 // Submissions of a form (read-only) or rows of a list (add, edit, deactivate).
@@ -95,6 +96,8 @@ const isList = computed(() => props.kind === 'list')
 const api = computed(() => definitionApis[props.kind])
 const title = computed(() => (isList.value ? 'Rows' : 'Submissions'))
 const noun = computed(() => (isList.value ? 'row' : 'response'))
+const canEdit = computed(() => can(props.tenantCode, isList.value ? 'rows.edit' : 'submissions.edit'))
+const canExport = computed(() => can(props.tenantCode, isList.value ? 'lists.view' : 'submissions.export'))
 
 const definition = ref(null)
 const columns = ref([])
@@ -108,7 +111,17 @@ const status = ref('active')
 const loading = ref(true)
 const loaded = ref(false)
 
-const csvUrl = computed(() => api.value.csvUrl(props.tenantCode, props.slug))
+const downloading = ref(false)
+async function downloadCsv() {
+  downloading.value = true
+  try {
+    await api.value.downloadCsv(props.tenantCode, props.slug)
+  } catch (e) {
+    notify.error('Could not download', e)
+  } finally {
+    downloading.value = false
+  }
+}
 const fields = computed(() => (definition.value?.fields || []).filter((f) => f.column_name).map(rendererField))
 
 async function load() {

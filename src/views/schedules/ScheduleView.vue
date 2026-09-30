@@ -15,7 +15,7 @@
       </div>
       <div class="actions">
         <SelectButton v-model="tab" :options="['Windows', 'Leave']" :allowEmpty="false" aria-label="Section" />
-        <Button :label="tab === 'Windows' ? 'Add window' : 'Add leave'" icon="pi pi-plus" :disabled="!schedule"
+        <Button v-if="canManage" :label="tab === 'Windows' ? 'Add window' : 'Add leave'" icon="pi pi-plus" :disabled="!schedule"
                 @click="tab === 'Windows' ? editWindow(null) : openLeave()" />
       </div>
     </div>
@@ -33,7 +33,7 @@
         <Column header="Status">
           <template #body="{ data }"><Tag :value="data.status" :severity="data.status === 'active' ? 'success' : 'secondary'" /></template>
         </Column>
-        <Column style="width: 110px">
+        <Column v-if="canManage" style="width: 110px">
           <template #body="{ data }">
             <div class="actions">
               <Button icon="pi pi-pencil" text rounded aria-label="Edit window" @click="editWindow(data)" />
@@ -58,7 +58,7 @@
         </Column>
         <Column header="Covers"><template #body="{ data }">{{ data.window_id ? windowLabel(data.window_id) : 'Whole day' }}</template></Column>
         <Column field="reason" header="Reason" />
-        <Column style="width: 70px">
+        <Column v-if="canManage" style="width: 70px">
           <template #body="{ data }">
             <Button icon="pi pi-trash" text rounded severity="danger" aria-label="Remove leave"
                     @click="setStatus('leaves', data, false)" />
@@ -136,12 +136,14 @@ import { useCatalog } from '@/composables/useCatalog'
 import { useNotify } from '@/composables/useNotify'
 import { ROUTES } from '@/router'
 import { schedulesApi } from '@/services/api'
+import { can } from '@/services/auth'
 import { displayValue, toApiValue } from '@/utils/format'
 
 const props = defineProps({
   tenantCode: { type: String, required: true },
   slug: { type: String, required: true }
 })
+const canManage = computed(() => can(props.tenantCode, 'timings.manage'))
 
 const notify = useNotify()
 const catalog = useCatalog(props.tenantCode)

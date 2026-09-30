@@ -40,7 +40,7 @@
         </Column>
         <Column style="width: 70px">
           <template #body="{ data }">
-            <Button v-if="data.status === 'booked'" icon="pi pi-times" text rounded severity="danger"
+            <Button v-if="data.status === 'booked' && can(tenantCode, 'bookings.cancel')" icon="pi pi-times" text rounded severity="danger"
                     aria-label="Cancel booking" v-tooltip.top="'Cancel booking'" @click="cancel(data)" />
           </template>
         </Column>
@@ -56,6 +56,7 @@ import TenantNav from '@/components/layout/TenantNav.vue'
 import { useCatalog } from '@/composables/useCatalog'
 import { useNotify } from '@/composables/useNotify'
 import { schedulesApi } from '@/services/api'
+import { can } from '@/services/auth'
 import { displayValue, toApiValue } from '@/utils/format'
 
 const props = defineProps({ tenantCode: { type: String, required: true } })

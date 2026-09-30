@@ -3,9 +3,10 @@
     <div class="page-head">
       <div>
         <h1>Tenants</h1>
-        <p class="sub">Each tenant is a clinic business with its own database schema.</p>
+        <p class="sub">{{ isPlatformAdmin ? 'Each tenant is a clinic business with its own database schema.'
+          : 'The clinics you work in.' }}</p>
       </div>
-      <Button label="New tenant" icon="pi pi-plus" @click="openCreate" />
+      <Button v-if="isPlatformAdmin" label="New tenant" icon="pi pi-plus" @click="openCreate" />
     </div>
 
     <div class="panel">
@@ -49,6 +50,23 @@
           <small class="hint">Lowercase letters, numbers and hyphens. Used in links later.</small>
           <small v-if="errors.code" class="error">{{ errors.code }}</small>
         </div>
+        <div class="section-label">First Clinic admin (can do everything in this clinic)</div>
+        <div class="field">
+          <label for="admin-name">Admin name<span class="required-star">*</span></label>
+          <InputText id="admin-name" v-model="draft.admin.name" fluid />
+          <small v-if="errors['admin.name']" class="error">{{ errors['admin.name'] }}</small>
+        </div>
+        <div class="field">
+          <label for="admin-email">Admin email<span class="required-star">*</span></label>
+          <InputText id="admin-email" v-model="draft.admin.email" type="email" fluid />
+          <small v-if="errors['admin.email']" class="error">{{ errors['admin.email'] }}</small>
+        </div>
+        <div class="field">
+          <label for="admin-password">Temporary password<span class="required-star">*</span></label>
+          <InputText id="admin-password" v-model="draft.admin.password" fluid />
+          <small class="hint">At least 10 characters. They must change it at first login.</small>
+          <small v-if="errors['admin.password']" class="error">{{ errors['admin.password'] }}</small>
+        </div>
       </form>
       <template #footer>
         <Button label="Cancel" severity="secondary" text @click="showCreate = false" />
@@ -63,7 +81,9 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNotify } from '@/composables/useNotify'
 import { ROUTES } from '@/router'
+import { clinicHome } from '@/router'
 import { tenantsApi } from '@/services/api'
+import { isPlatformAdmin } from '@/services/auth'
 import { formatEpoch, tenantCodeFromName } from '@/utils/format'
 
 const router = useRouter()
@@ -74,8 +94,9 @@ const loading = ref(false)
 const showCreate = ref(false)
 const saving = ref(false)
 const codeEdited = ref(false)
-const draft = reactive({ name: '', code: '' })
-const errors = reactive({ name: '', code: '' })
+const EMPTY_ERRORS = { name: '', code: '', 'admin.name': '', 'admin.email': '', 'admin.password': '' }
+const draft = reactive({ name: '', code: '', admin: { name: '', email: '', password: '' } })
+const errors = reactive({ ...EMPTY_ERRORS })
 
 function syncCode() {
   if (!codeEdited.value) draft.code = tenantCodeFromName(draft.name)
@@ -93,17 +114,17 @@ async function load() {
 }
 
 function openCreate() {
-  Object.assign(draft, { name: '', code: '' })
-  Object.assign(errors, { name: '', code: '' })
+  Object.assign(draft, { name: '', code: '', admin: { name: '', email: '', password: '' } })
+  Object.assign(errors, EMPTY_ERRORS)
   codeEdited.value = false
   showCreate.value = true
 }
 
 async function createTenant() {
-  Object.assign(errors, { name: '', code: '' })
+  Object.assign(errors, EMPTY_ERRORS)
   saving.value = true
   try {
-    const { tenant } = await tenantsApi.create({ name: draft.name, code: draft.code })
+    const { tenant } = await tenantsApi.create({ name: draft.name, code: draft.code, admin: { ...draft.admin } })
     showCreate.value = false
     notify.success('Tenant created', `Schema ${tenant.schema_name} is ready.`)
     router.push({ name: ROUTES.FORMS, params: { tenantCode: tenant.code } })
@@ -116,7 +137,7 @@ async function createTenant() {
 }
 
 function openTenant(tenant) {
-  router.push({ name: ROUTES.FORMS, params: { tenantCode: tenant.code } })
+  router.push(clinicHome(tenant.code))
 }
 
 onMounted(load)

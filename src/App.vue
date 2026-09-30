@@ -1,5 +1,5 @@
 <template>
-  <AppHeader v-if="!route.meta.public" />
+  <AppHeader v-if="!route.meta.public && !route.meta.guest" />
   <router-view />
   <Toast position="bottom-right" />
   <ConfirmDialog />

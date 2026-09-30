@@ -9,7 +9,10 @@ export function useCatalog(tenantCode) {
   const entry = (cache[tenantCode] ||= { lists: ref([]), schedules: ref([]), definitions: {}, loading: null })
 
   function load() {
-    entry.loading ||= Promise.all([listsApi.list(tenantCode), schedulesApi.list(tenantCode)])
+    // A user without permission to see lists or schedules simply gets none.
+    const allowed = (call, empty) => call.catch((e) => (e.httpStatus === 403 ? empty : Promise.reject(e)))
+    entry.loading ||= Promise.all([allowed(listsApi.list(tenantCode), { lists: [] }),
+      allowed(schedulesApi.list(tenantCode), { schedules: [] })])
       .then(([l, s]) => {
         entry.lists.value = l.lists.filter((x) => x.display_field_id)   // only usable lists
         entry.schedules.value = s.schedules

@@ -1,7 +1,9 @@
 <template>
   <nav class="crumbs" aria-label="Breadcrumb">
-    <router-link :to="{ name: ROUTES.TENANTS }">Tenants</router-link>
-    <i class="pi pi-angle-right" aria-hidden="true" />
+    <template v-if="showTenants">
+      <router-link :to="{ name: ROUTES.TENANTS }">Tenants</router-link>
+      <i class="pi pi-angle-right" aria-hidden="true" />
+    </template>
     <router-link :to="{ name: section.route, params: { tenantCode } }">{{ tenant?.name || tenantCode }}</router-link>
     <template v-for="(crumb, i) in crumbs" :key="i">
       <i class="pi pi-angle-right" aria-hidden="true" />
@@ -10,7 +12,7 @@
     </template>
   </nav>
   <div class="tenant-tabs" role="tablist">
-    <router-link v-for="tab in TABS" :key="tab.route" role="tab" class="tenant-tab"
+    <router-link v-for="tab in tabs" :key="tab.route" role="tab" class="tenant-tab"
                  :class="{ active: tab.route === section.route }" :to="{ name: tab.route, params: { tenantCode } }">
       <i :class="tab.icon" aria-hidden="true" /> {{ tab.label }}
     </router-link>
@@ -20,8 +22,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ROUTES } from '@/router'
+import { CLINIC_TABS, ROUTES } from '@/router'
 import { loadTenant } from '@/composables/useTenant'
+import { can, clinics, isPlatformAdmin } from '@/services/auth'
 
 const props = defineProps({
   tenantCode: { type: String, required: true },
@@ -29,12 +32,9 @@ const props = defineProps({
   crumbs: { type: Array, default: () => [] }
 })
 
-const TABS = [
-  { label: 'Forms', icon: 'pi pi-file-edit', route: ROUTES.FORMS, match: ['form'] },
-  { label: 'Lists', icon: 'pi pi-table', route: ROUTES.LISTS, match: ['list'] },
-  { label: 'Schedules', icon: 'pi pi-calendar-clock', route: ROUTES.SCHEDULES, match: ['schedule'] },
-  { label: 'Bookings', icon: 'pi pi-ticket', route: ROUTES.BOOKINGS, match: ['booking'] }
-]
+// Only the tabs this user may open; the clinic list only for people who have more than one clinic.
+const tabs = computed(() => CLINIC_TABS.filter((t) => can(props.tenantCode, t.permission)))
+const showTenants = computed(() => isPlatformAdmin.value || clinics.value.length > 1)
 
 const tenant = ref(null)
 watch(() => props.tenantCode, async (code) => {
@@ -44,7 +44,7 @@ watch(() => props.tenantCode, async (code) => {
 const route = useRoute()
 const section = computed(() => {
   const name = String(route.name || '')
-  return TABS.find((t) => t.match.some((m) => name.startsWith(m)) || name === t.route) || TABS[0]
+  return CLINIC_TABS.find((t) => t.match.some((m) => name.startsWith(m)) || name === t.route) || CLINIC_TABS[0]
 })
 
 defineExpose({ tenant })

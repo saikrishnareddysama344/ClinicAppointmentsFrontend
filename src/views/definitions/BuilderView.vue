@@ -29,13 +29,13 @@
           </p>
         </div>
         <div class="actions">
-          <Button v-if="!b.isDraft.value" :label="kind === 'form' ? 'Submissions' : 'Rows'"
+          <Button v-if="!b.isDraft.value && canRows" :label="kind === 'form' ? 'Submissions' : 'Rows'"
                   :icon="kind === 'form' ? 'pi pi-inbox' : 'pi pi-table'" severity="secondary" text
                   @click="router.push({ name: KIND_ROUTES[kind].rows, params: { tenantCode, slug } })" />
           <Button label="Preview" icon="pi pi-eye" severity="secondary" outlined @click="showPreview = true" />
-          <Button label="Save" icon="pi pi-save" :severity="kind === 'form' ? 'secondary' : undefined"
+          <Button v-if="canManage" label="Save" icon="pi pi-save" :severity="kind === 'form' ? 'secondary' : undefined"
                   :loading="b.saving.value" :disabled="!b.dirty.value" @click="save" />
-          <Button v-if="kind === 'form'" :label="b.isDraft.value ? 'Publish' : 'Publish changes'" icon="pi pi-upload"
+          <Button v-if="kind === 'form' && canManage" :label="b.isDraft.value ? 'Publish' : 'Publish changes'" icon="pi pi-upload"
                   :loading="b.publishing.value || publishSaving" :disabled="!b.canPublish.value || publishSaving"
                   @click="confirmPublish" />
         </div>
@@ -124,6 +124,7 @@ import FormRenderer from '@/components/forms/FormRenderer.vue'
 import TenantNav from '@/components/layout/TenantNav.vue'
 import { useBuilder } from '@/composables/useBuilder'
 import { useCatalog } from '@/composables/useCatalog'
+import { can } from '@/services/auth'
 import { useNotify } from '@/composables/useNotify'
 import { SLOT_TYPE } from '@/constants/fieldTypes'
 import { FLAG_YES, FORM_STATUS } from '@/constants/formStatus'
@@ -136,6 +137,8 @@ const props = defineProps({
   slug: { type: String, required: true },
   kind: { type: String, default: 'form' }
 })
+const canManage = computed(() => can(props.tenantCode, `${props.kind}s.manage`))
+const canRows = computed(() => can(props.tenantCode, props.kind === 'form' ? 'submissions.view' : 'lists.view'))
 
 const b = useBuilder(props.tenantCode, props.slug, props.kind)
 const catalog = useCatalog(props.tenantCode)

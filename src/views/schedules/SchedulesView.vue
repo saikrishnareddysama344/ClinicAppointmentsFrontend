@@ -7,7 +7,7 @@
         <h1>Schedules</h1>
         <p class="sub">When each doctor (or anyone in a list) can be booked: weekly time windows with a token limit, and leave.</p>
       </div>
-      <Button label="New schedule" icon="pi pi-plus" @click="openCreate" />
+      <Button v-if="can(tenantCode, 'timings.manage')" label="New schedule" icon="pi pi-plus" @click="openCreate" />
     </div>
 
     <div class="panel">
@@ -68,6 +68,7 @@ import { useCatalog } from '@/composables/useCatalog'
 import { useNotify } from '@/composables/useNotify'
 import { ROUTES } from '@/router'
 import { schedulesApi } from '@/services/api'
+import { can } from '@/services/auth'
 
 const props = defineProps({ tenantCode: { type: String, required: true } })
 
