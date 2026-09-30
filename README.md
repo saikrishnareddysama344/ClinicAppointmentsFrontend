@@ -13,28 +13,9 @@ npm run dev
 Open http://localhost:5173 (or the port in `VITE_DEV_PORT`). Start the backend first.
 The header shows a green **API** dot when the backend and database are reachable.
 
-## Automated tests (Playwright)
+## Automated tests
 
-First time only:
-```
-npm install
-npm run test:e2e:install      (downloads the Chromium browser for tests)
-```
-
-Run everything (API tests + browser tests):
-```
-npm run test:e2e
-```
-
-- It starts its **own** backend (port 5055) and frontend (port 5174), so it can run while your
-  normal dev servers are running.
-- It uses your database, but only the test schemas `e2e_config` and `e2e_t_*`, which are
-  wiped before and after each run. Your real `app_config` and `t_*` data is never touched
-  (the backend refuses to wipe any schema not starting with `e2e_` or `test_`).
-- `npm run test:e2e:api` runs only the API tests; `npm run test:e2e:ui` only the browser tests;
-  `npm run test:e2e:headed` shows the browser while it clicks.
-- After a failure, `npm run test:e2e:report` opens a report with screenshots, a video and a
-  step-by-step trace of what went wrong. Set `E2E_KEEP_DATA=1` to keep the test data.
+They live in the separate `tests` folder next to `frontend` and `backend`; see its README.
 
 ## Settings
 
@@ -73,6 +54,3 @@ src/
 └── assets/styles/main.css
 ```
 
-tests/e2e/                  Playwright tests (see "Automated tests" above)
-├── api/forms.spec.js       Every backend endpoint
-└── ui/booking-flow.spec.js Build, publish, submit as a patient, see the response
