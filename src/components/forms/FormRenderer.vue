@@ -145,6 +145,7 @@ const emit = defineEmits(['submitted'])
 const values = reactive({})
 const errors = reactive({})
 
+let initialPass = true   // true while the starting answers are being applied
 watch(() => [props.fields.map((f) => f.key), props.initialValues], () => reset(), { immediate: true })
 
 // ---------- dropdowns fed by lists (optionally depending on an earlier dropdown) ----------
@@ -186,7 +187,6 @@ async function loadOptions(field, initial) {
 // One entry per list dropdown: its key and its parent's current value. Reload what changed.
 const dependencies = computed(() => props.fields.filter(isList)
   .map((f) => `${f.key}:${parentOf(f) ? values[parentOf(f).key] ?? '' : ''}`))
-let initialPass = true   // true while the starting answers are being applied
 watch(dependencies, (now, before = []) => {
   const seen = new Set(before.map((e) => e.split(':')[0]))
   for (const entry of now.filter((e) => !before.includes(e))) {
