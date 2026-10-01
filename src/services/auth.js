@@ -26,7 +26,6 @@ export const user = ref(null)
 let loading = null
 setToken(read(TOKEN_KEY))
 
-export const isLoggedIn = computed(() => !!user.value)
 export const isPlatformAdmin = computed(() => !!user.value?.is_platform_admin)
 export const mustChangePassword = computed(() => !!user.value?.must_change_password)
 export const clinics = computed(() => user.value?.clinics || [])
@@ -53,18 +52,9 @@ export function hasPageLike(tenantCode, prefix, action = 'view') {
     .some(([key, page]) => key.startsWith(prefix) && page.actions.includes(action))
 }
 
-// "edit" | "display" | "hidden" for a column of a table page.
-export function columnLevel(tenantCode, page, column) {
-  if (isAdmin(tenantCode)) return 'edit'
-  return clinicOf(tenantCode)?.pages?.[page]?.columns?.[String(column)] || 'hidden'
-}
-
 // Do the user's roles limit which values of a list (e.g. which branches) they may use?
 export const isLimited = (tenantCode, listId) => !isAdmin(tenantCode)
   && !!clinicOf(tenantCode)?.limited_lists?.includes(`list:${listId}`)
-
-// Does a row filter limit what this user sees on that page?
-export const isFiltered = (tenantCode, page) => !isAdmin(tenantCode) && !!clinicOf(tenantCode)?.pages?.[page]?.filtered
 
 // Loads the user once (after a page load); null when not logged in.
 export function loadUser() {

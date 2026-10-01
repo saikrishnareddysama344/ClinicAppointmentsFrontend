@@ -10,6 +10,3 @@ export function loadTenant(code) {
   })
   return cache[code]
 }
-
-// Call after changes that alter what the tenant list shows (e.g. form counts).
-export const forgetTenant = (code) => delete cache[code]
