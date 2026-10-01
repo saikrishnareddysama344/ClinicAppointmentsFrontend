@@ -60,6 +60,17 @@
         <InputText id="f-help" v-model="field.help_text" fluid maxlength="500" placeholder="Shown under the field" />
       </div>
 
+      <div class="visibility">
+        <div class="strong">Visibility</div>
+        <div v-for="v in visibilityOptions" :key="v.key" class="vis-row">
+          <ToggleSwitch :inputId="`f-vis-${v.key}`" v-model="field.visibility[v.key]" :disabled="v.disabled" />
+          <div>
+            <label :for="`f-vis-${v.key}`">{{ v.label }}</label>
+            <small class="hint">{{ v.hint }}</small>
+          </div>
+        </div>
+      </div>
+
       <template v-if="field.data_type === DROPDOWN_TYPE">
         <div class="field">
           <label for="f-source">Options come from</label>
@@ -179,6 +190,23 @@ watch(() => [props.field?.list_id, props.field?.depends_on_field_id], async () =
 
 const locked = computed(() => !!props.field?.column_name)
 
+// Where the field shows up. The server also refuses hiding a field others rely on (a slot's phone,
+// a dropdown another one filters by) and retiring a list's display column.
+const visibilityOptions = computed(() => {
+  const f = props.field
+  const slot = f.data_type === SLOT_TYPE
+  return [
+    props.kind === 'form' && { key: 'hide_public', label: 'Hide on public form (staff only)', disabled: slot,
+      hint: slot ? 'Patients always choose their appointment.'
+        : 'Patients do not see it; staff fill it in. Not required of patients even when mandatory.' },
+    { key: 'hide_table', label: 'Hide in table',
+      hint: 'Not a column in the table; still in the CSV and the edit dialog.' },
+    { key: 'retired', label: 'Retire field', disabled: slot || f.is_display,
+      hint: slot || f.is_display ? 'This field cannot be retired.'
+        : 'Used nowhere any more (form, table, bookings); its saved data stays in the CSV. Switch off to bring it back.' }
+  ].filter(Boolean)
+})
+
 const columnName = computed(() =>
   props.field?.column_name || props.columnPreview(props.field?.display_label) || 'field_ID (set when published)'
 )
@@ -196,6 +224,24 @@ async function addOption(at) {
 </script>
 
 <style scoped>
+.visibility {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border-top: 1px solid var(--p-content-border-color);
+  padding-top: 0.75rem;
+}
+
+.vis-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.vis-row .hint {
+  display: block;
+}
+
 .strong {
   font-weight: 600;
 }

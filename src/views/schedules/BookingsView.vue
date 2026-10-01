@@ -106,6 +106,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useConfirm } from 'primevue/useconfirm'
+import { useRoute } from 'vue-router'
 import TenantNav from '@/components/layout/TenantNav.vue'
 import { loadClinic } from '@/composables/useClinic'
 import { useNotify } from '@/composables/useNotify'
@@ -133,7 +134,9 @@ const confirm = useConfirm()
 
 const setup = ref(null)
 const settings = ref({})
-const day = ref(new Date())
+// ?date=YYYY-MM-DD (from Doctor timings, By date) opens that day.
+const queryDate = useRoute().query.date
+const day = ref(/^\d{4}-\d{2}-\d{2}$/.test(queryDate || '') ? new Date(`${queryDate}T00:00:00`) : new Date())
 const windows = ref([])
 const filtered = ref(false)
 const loading = ref(true)

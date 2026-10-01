@@ -17,7 +17,7 @@
         v-for="(field, index) in fields"
         :key="field.key"
         class="field-item"
-        :class="{ selected: field.key === selectedKey, 'has-error': errors[field.key]?.length }"
+        :class="{ selected: field.key === selectedKey, 'has-error': errors[field.key]?.length, retired: field.visibility?.retired }"
         @click="emit('select', field.key)"
       >
         <span class="order">{{ index + 1 }}</span>
@@ -28,6 +28,11 @@
           <div class="meta">
             <span>{{ typeName(field.data_type) }}</span>
             <span v-if="field.is_display" class="display-badge"><i class="pi pi-star-fill" aria-hidden="true" /> display</span>
+            <span v-if="field.visibility?.retired" class="vis-badge"><i class="pi pi-ban" aria-hidden="true" /> retired</span>
+            <template v-else>
+              <span v-if="field.visibility?.hide_public" class="vis-badge"><i class="pi pi-eye-slash" aria-hidden="true" /> staff only</span>
+              <span v-if="field.visibility?.hide_table" class="vis-badge"><i class="pi pi-table" aria-hidden="true" /> not in table</span>
+            </template>
             <span v-if="field.column_name" v-tooltip.top="'Published column: type is locked'">
               <i class="pi pi-lock" aria-hidden="true" /> {{ field.column_name }}
             </span>
@@ -94,5 +99,14 @@ const addMenuItems = computed(() =>
 
 .display-badge {
   color: var(--p-primary-color);
+}
+
+.vis-badge {
+  color: var(--p-orange-600, #c2410c);
+}
+
+.field-item.retired .label {
+  color: var(--p-text-muted-color);
+  text-decoration: line-through;
 }
 </style>

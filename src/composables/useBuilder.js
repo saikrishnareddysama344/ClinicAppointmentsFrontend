@@ -9,6 +9,9 @@ import { useBuilderConfig } from './useBuilderConfig'
 let keySeed = 0
 const nextKey = () => `k${++keySeed}`
 
+// Builder visibility switches (only the ones that are on are sent).
+const VISIBILITY_OFF = Object.freeze({ hide_public: false, hide_table: false, retired: false })
+
 export function useBuilder(tenantCode, slug, kind = 'form') {
   const config = useBuilderConfig()
   const api = definitionApis[kind]
@@ -47,7 +50,9 @@ export function useBuilder(tenantCode, slug, kind = 'form') {
       match_field_id: options.match_field_id ?? null,
       // appointment slot
       schedule_id: options.schedule_id ?? null,
-      contact_field_id: options.contact_field_id ?? null
+      contact_field_id: options.contact_field_id ?? null,
+      // hidden on the public form / in the table, or retired (see FieldSettings)
+      visibility: { ...VISIBILITY_OFF, ...(apiField.visibility || {}) }
     }
   }
 
@@ -74,7 +79,9 @@ export function useBuilder(tenantCode, slug, kind = 'form') {
       max_length: config.isLengthType(field.data_type) ? field.max_length ?? null : null,
       placeholder: field.placeholder.trim() || null,
       help_text: field.help_text.trim() || null,
-      options_config: optionsConfig(field)
+      options_config: optionsConfig(field),
+      visibility: Object.fromEntries(Object.keys(VISIBILITY_OFF)
+        .filter((k) => field.visibility[k] && (kind === 'form' || k !== 'hide_public')).map((k) => [k, true]))
     }
     if (field.id) payload.id = field.id
     if (kind === 'list') payload.is_display = field.is_display
@@ -178,7 +185,8 @@ export function useBuilder(tenantCode, slug, kind = 'form') {
       max_length: null, placeholder: '', help_text: '', source: config.staticSource.value,
       options: type === DROPDOWN_TYPE ? [...NEW_DROPDOWN_OPTIONS] : [],
       is_display: kind === 'list' && !fields.value.some((f) => f.is_display) && config.isDisplayType(type),
-      list_id: null, depends_on_field_id: null, match_field_id: null, schedule_id: null, contact_field_id: null
+      list_id: null, depends_on_field_id: null, match_field_id: null, schedule_id: null, contact_field_id: null,
+      visibility: { ...VISIBILITY_OFF }
     }
   }
 
@@ -199,6 +207,7 @@ export function useBuilder(tenantCode, slug, kind = 'form') {
   function duplicate(index) {
     const source = fields.value[index]
     const copy = { ...source, key: nextKey(), id: null, column_name: null, options: [...source.options],
+      visibility: { ...source.visibility },
       display_label: `${source.display_label} copy`, is_display: false }
     fields.value.splice(index + 1, 0, copy)
     selectedKey.value = copy.key

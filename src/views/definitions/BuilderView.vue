@@ -101,7 +101,7 @@
         Nothing is saved from here.
       </div>
       <FormRenderer
-        :fields="b.fields.value"
+        :fields="previewFields"
         :inputTypes="b.config.inputTypes.value"
         :staticSource="b.config.staticSource.value"
         :defaultTextLength="b.config.limits.value.default_text_length"
@@ -150,6 +150,10 @@ const meta = computed(() => KINDS[props.kind])
 const fieldTypes = computed(() => b.config.dataTypes.value.filter((t) => props.kind === 'form' || t.type_key !== SLOT_TYPE))
 
 // Preview dropdowns fed by lists use the admin options endpoint (filtered like the public form).
+// Patients (forms) never see staff-only or retired fields; staff adding a row never see retired ones.
+const previewFields = computed(() => b.fields.value.filter((f) => !f.visibility?.retired
+  && !(props.kind === 'form' && f.visibility?.hide_public)))
+
 function previewOptions(field, parentValue) {
   const filter = field.depends_on_field_id ? { filter_field_id: field.match_field_id, filter_value: parentValue } : {}
   return catalog.listOptions(field.list_id, filter)

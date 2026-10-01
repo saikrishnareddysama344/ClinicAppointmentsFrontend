@@ -36,7 +36,7 @@
             {{ isList ? 'No rows here yet. Use "Add row".' : "No submissions yet. Share the form's public link to start collecting responses." }}
           </div>
         </template>
-        <Column v-for="col in columns" :key="col.key" :field="col.key" :header="col.label">
+        <Column v-for="col in tableColumns" :key="col.key" :field="col.key" :header="col.label">
           <template #body="{ data }">
             <Tag v-if="col.key === 'status'" :value="data.status" :severity="data.status === 'active' ? 'success' : 'secondary'" />
             <span v-else :class="{ muted: data[col.key] === null || data[col.key] === undefined }">
@@ -145,7 +145,9 @@ const slotApi = (field) => ({
     (await publicApi.options(props.tenantCode, props.slug, field.id, { part, where_id: whereId })).options,
   availability: (params) => publicApi.availability(props.tenantCode, props.slug, field.id, params)
 })
-const fields = computed(() => (definition.value?.fields || []).filter((f) => f.column_name)
+// Retired fields are never filled; "hide in table" fields are left out of the table only.
+const tableColumns = computed(() => columns.value.filter((c) => !c.hidden))
+const fields = computed(() => (definition.value?.fields || []).filter((f) => f.column_name && !f.visibility?.retired)
   .map((f) => rendererField({ ...f, slot: slotInfo.value[f.id] })))
 const accessOf = (key) => (definition.value?.fields || []).find((f) => String(f.id) === String(key))?.access || 'hidden'
 // A booking is made when a submission is added; an existing one is changed on the Bookings page.

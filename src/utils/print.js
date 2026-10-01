@@ -40,7 +40,7 @@ export function receiptHtml(data) {
       ${b.where ? `<tr><td>${esc(data.where_label || 'Branch')}</td><td>${esc(b.where)}</td></tr>` : ''}
       <tr><td>Date</td><td>${esc(day(b.date))}</td></tr>
       <tr><td>Time</td><td>${esc(b.start)}–${esc(b.end)}</td></tr>
-      ${data.patient.map((a) => `<tr><td>${esc(a.label)}</td><td>${esc(value(a))}</td></tr>`).join('')}
+      ${data.patient.filter((a) => !a.staff_only).map((a) => `<tr><td>${esc(a.label)}</td><td>${esc(value(a))}</td></tr>`).join('')}
       ${b.op_number ? `<tr><td>OP number</td><td>${esc(b.op_number)}</td></tr>` : ''}
       <tr><td>Booking no.</td><td>${esc(b.id)}</td></tr>
       <tr><td>Booked</td><td>${esc(stamp(b.created_at))} (${esc(data.booked_by)})</td></tr>

@@ -12,8 +12,9 @@
         </p>
       </div>
       <div class="actions">
-        <SelectButton v-model="tab" :options="['Windows', 'Leave']" :allowEmpty="false" aria-label="Section" />
-        <Button v-if="tab === 'Windows' ? canDo('add') : canDo('leave_add')" :label="tab === 'Windows' ? 'Add window' : 'Add leave'"
+        <SelectButton v-model="tab" :options="['Windows', 'Leave', 'By date']" :allowEmpty="false" aria-label="Section"
+                      @change="tab === 'By date' && loadCalendar()" />
+        <Button v-if="tab !== 'By date' && (tab === 'Windows' ? canDo('add') : canDo('leave_add'))" :label="tab === 'Windows' ? 'Add window' : 'Add leave'"
                 icon="pi pi-plus" :disabled="!schedule" @click="tab === 'Windows' ? editWindow(null) : openLeave()" />
       </div>
     </div>
@@ -26,6 +27,36 @@
         <router-link :to="{ name: ROUTES.SETTINGS, params: { tenantCode } }">Clinic settings</router-link>.
       </template>
       <template v-else>Ask your clinic admin to set it up.</template>
+    </div>
+
+    <div v-else-if="tab === 'By date'" class="panel">
+      <div class="cal-controls">
+        <DatePicker v-model="cal.from" dateFormat="dd/mm/yy" showIcon ariaLabel="From date" @update:modelValue="loadCalendar" />
+        <SelectButton v-model="cal.days" :options="DAY_RANGES" optionLabel="label" optionValue="value" :allowEmpty="false"
+                      aria-label="Days" @change="loadCalendar" />
+        <small v-if="canBookings" class="muted">Click a timing to open that day's bookings.</small>
+      </div>
+      <div v-if="cal.loading && !cal.list.length" class="empty">Loading…</div>
+      <section v-for="d in cal.list" :key="d.date" class="cal-day">
+        <div class="cal-date" :class="{ today: d.date === cal.today }">
+          {{ dayLabel(d.date) }}<Tag v-if="d.date === cal.today" value="today" severity="info" class="ml" />
+        </div>
+        <div v-if="!d.timings.length" class="muted cal-none">No timings</div>
+        <DataTable v-else :value="d.timings" dataKey="window_id" size="small"
+                   :rowClass="(x) => [['past', 'inactive'].includes(x.state) ? 'muted' : '', canBookings ? 'clickable-row' : '']"
+                   @row-click="(e) => openBookings(d.date)">
+          <Column field="who" :header="schedule?.who_list.name" />
+          <Column v-if="schedule?.where_list" field="where" :header="schedule.where_list.name" />
+          <Column header="Time" style="width: 130px"><template #body="{ data }">{{ data.start }}–{{ data.end }}</template></Column>
+          <Column header="Tokens" style="width: 110px"><template #body="{ data }">{{ data.booked }} / {{ data.max_tokens }}</template></Column>
+          <Column header="Status" style="width: 240px">
+            <template #body="{ data }">
+              <Tag :value="STATES[data.state].label" :severity="STATES[data.state].severity" />
+              <span v-if="data.leave_reason" class="muted"> {{ data.leave_reason }}</span>
+            </template>
+          </Column>
+        </DataTable>
+      </section>
     </div>
 
     <div v-else-if="tab === 'Windows'" class="panel">
@@ -140,6 +171,8 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import TenantNav from '@/components/layout/TenantNav.vue'
+import { useRouter } from 'vue-router'
+import { appConfig } from '@/config/env'
 import { useNotify } from '@/composables/useNotify'
 import { loadClinic } from '@/composables/useClinic'
 import { ROUTES } from '@/router'
@@ -184,11 +217,48 @@ async function load() {
     filtered.value = w.filtered
     leaves.value = l.leaves
     Object.assign(options, { who, where })
+    if (tab.value === 'By date') loadCalendar()
   } catch (e) {
     notify.error('Could not load the timings', e)
   } finally {
     loading.value = false
   }
+}
+
+// ---------- by date ----------
+const DAY_RANGES = [7, 14, 31].map((value) => ({ value, label: `${value} days` }))
+const STATES = {
+  open: { label: 'Open', severity: 'success' },
+  full: { label: 'Full', severity: 'warn' },
+  leave: { label: 'On leave', severity: 'danger' },
+  closed: { label: 'Session ended', severity: 'secondary' },
+  past: { label: 'Past', severity: 'secondary' },
+  not_open: { label: 'Not open for booking yet', severity: 'secondary' },
+  inactive: { label: 'Inactive', severity: 'secondary' }
+}
+const router = useRouter()
+const canBookings = computed(() => can(t, 'bookings'))
+const cal = reactive({ from: new Date(), days: 7, list: [], today: null, loading: false })
+const dayLabel = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString(appConfig.locale,
+  { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+
+let calendarRequest = 0
+async function loadCalendar() {
+  if (!schedule.value || !cal.from) return
+  const mine = ++calendarRequest   // only the latest answer is shown
+  cal.loading = true
+  try {
+    const body = await schedulesApi.calendar(t, slug(), { from: toApiValue('date', cal.from), days: cal.days })
+    if (mine === calendarRequest) Object.assign(cal, { list: body.days, today: body.today })
+  } catch (e) {
+    notify.error('Could not load the dates', e)
+  } finally {
+    cal.loading = false
+  }
+}
+
+function openBookings(date) {
+  if (canBookings.value) router.push({ name: ROUTES.BOOKINGS, params: { tenantCode: t }, query: { date } })
 }
 
 // ---------- windows ----------
@@ -262,5 +332,36 @@ onMounted(load)
 
 .grow {
   flex: 1;
+}
+
+.ml {
+  margin-left: 0.5rem;
+}
+
+.cal-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.cal-day {
+  margin-bottom: 1rem;
+}
+
+.cal-date {
+  font-weight: 600;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--p-content-border-color);
+  margin-bottom: 0.3rem;
+}
+
+.cal-date.today {
+  color: var(--p-primary-color);
+}
+
+.cal-none {
+  padding: 0.3rem 0 0.5rem;
 }
 </style>
