@@ -99,7 +99,7 @@
         <Column field="reason" header="Reason" />
         <Column v-if="canDo('leave_remove')" style="width: 70px">
           <template #body="{ data }">
-            <Button icon="pi pi-trash" text rounded severity="danger" aria-label="Remove leave"
+            <Button v-if="canRemoveLeave(data)" icon="pi pi-trash" text rounded severity="danger" aria-label="Remove leave"
                     @click="setStatus('leaves', data, false)" />
           </template>
         </Column>
@@ -111,11 +111,13 @@
       <form class="form-grid" @submit.prevent="saveWindow">
         <div class="field">
           <label for="w-who">{{ schedule?.who_list.name }}</label>
-          <Select inputId="w-who" v-model="win.who_id" :options="options.who" optionLabel="label" optionValue="id" filter fluid />
+          <Select inputId="w-who" v-model="win.who_id" :options="options.who" optionLabel="label" optionValue="id" filter fluid
+                  :ariaLabel="schedule?.who_list.name" />
         </div>
         <div v-if="schedule?.where_list" class="field">
           <label for="w-where">{{ schedule.where_list.name }}</label>
-          <Select inputId="w-where" v-model="win.where_id" :options="options.where" optionLabel="label" optionValue="id" fluid />
+          <Select inputId="w-where" v-model="win.where_id" :options="options.where" optionLabel="label" optionValue="id" fluid
+                  :ariaLabel="schedule.where_list.name" />
         </div>
         <div class="field">
           <label for="w-day">Day</label>
@@ -144,11 +146,11 @@
           <DatePicker inputId="l-date" v-model="leave.day" dateFormat="dd/mm/yy" showIcon fluid />
         </div>
         <div class="field">
-          <label for="l-who">{{ schedule?.who_list.name }} (empty = everyone)</label>
+          <label for="l-who">{{ schedule?.who_list.name }}<template v-if="!limited.who"> (empty = everyone)</template></label>
           <Select inputId="l-who" v-model="leave.who_id" :options="options.who" optionLabel="label" optionValue="id" showClear fluid />
         </div>
         <div v-if="schedule?.where_list" class="field">
-          <label for="l-where">{{ schedule.where_list.name }} (empty = all)</label>
+          <label for="l-where">{{ schedule.where_list.name }}<template v-if="!limited.where"> (empty = all)</template></label>
           <Select inputId="l-where" v-model="leave.where_id" :options="options.where" optionLabel="label" optionValue="id" showClear fluid />
         </div>
         <div class="field">
@@ -177,7 +179,7 @@ import { useNotify } from '@/composables/useNotify'
 import { loadClinic } from '@/composables/useClinic'
 import { ROUTES } from '@/router'
 import { listsApi, schedulesApi } from '@/services/api'
-import { can, isAdmin } from '@/services/auth'
+import { can, isAdmin, isLimited } from '@/services/auth'
 import { displayValue, toApiValue } from '@/utils/format'
 
 const props = defineProps({ tenantCode: { type: String, required: true } })
@@ -264,8 +266,19 @@ function openBookings(date) {
 // ---------- windows ----------
 const win = reactive({ open: false, id: null, error: '', saving: false })
 
+// The role may use only some doctors / branches (their lists' values): only those are offered, and a
+// single one is chosen already. Leave must then name them (no "everyone" / "all").
+const only = (list) => (list.length === 1 ? list[0].id : null)
+const limited = computed(() => ({
+  who: !!schedule.value && isLimited(t, schedule.value.who_list.id),
+  where: !!schedule.value?.where_list && isLimited(t, schedule.value.where_list.id)
+}))
+const canRemoveLeave = (l) => (!limited.value.who || options.who.some((o) => o.id === l.who_id))
+  && (!limited.value.where || options.where.some((o) => o.id === l.where_id))
+
 function editWindow(w) {
-  Object.assign(win, { open: true, error: '', id: w?.id || null, who_id: w?.who_id ?? null, where_id: w?.where_id ?? null,
+  Object.assign(win, { open: true, error: '', id: w?.id || null, who_id: w?.who_id ?? only(options.who),
+    where_id: w?.where_id ?? only(options.where),
     weekday: w?.weekday ?? 0, start_time: w?.start_time || '09:00', end_time: w?.end_time || '12:00',
     max_tokens: w?.max_tokens ?? 20 })
 }
@@ -294,7 +307,8 @@ const leaveWindows = computed(() => windows.value
   .map((w) => ({ id: w.id, label: `${w.who}${w.where ? ` · ${w.where}` : ''} · ${w.start_time}–${w.end_time}` })))
 
 function openLeave() {
-  Object.assign(leave, { open: true, error: '', day: null, who_id: null, where_id: null, window_id: null, reason: '' })
+  Object.assign(leave, { open: true, error: '', day: null, window_id: null, reason: '',
+    who_id: limited.value.who ? only(options.who) : null, where_id: limited.value.where ? only(options.where) : null })
 }
 
 async function saveLeave() {

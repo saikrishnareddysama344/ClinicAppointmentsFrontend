@@ -45,11 +45,12 @@ export function can(tenantCode, page, action = 'view') {
   return !!clinicOf(tenantCode)?.pages?.[page]?.actions.includes(action)
 }
 
-// Any page whose key starts with prefix ("form:" = some form's submissions), optionally with an action.
-export function hasPageLike(tenantCode, prefix, action = null) {
+// Any page whose key starts with prefix ("form:" = some form's submissions) the user may do action on
+// (a list entry without actions only limits that list's values: it opens nothing).
+export function hasPageLike(tenantCode, prefix, action = 'view') {
   if (isAdmin(tenantCode)) return true
   return Object.entries(clinicOf(tenantCode)?.pages || {})
-    .some(([key, page]) => key.startsWith(prefix) && (!action || page.actions.includes(action)))
+    .some(([key, page]) => key.startsWith(prefix) && page.actions.includes(action))
 }
 
 // "edit" | "display" | "hidden" for a column of a table page.
@@ -57,6 +58,10 @@ export function columnLevel(tenantCode, page, column) {
   if (isAdmin(tenantCode)) return 'edit'
   return clinicOf(tenantCode)?.pages?.[page]?.columns?.[String(column)] || 'hidden'
 }
+
+// Do the user's roles limit which values of a list (e.g. which branches) they may use?
+export const isLimited = (tenantCode, listId) => !isAdmin(tenantCode)
+  && !!clinicOf(tenantCode)?.limited_lists?.includes(`list:${listId}`)
 
 // Does a row filter limit what this user sees on that page?
 export const isFiltered = (tenantCode, page) => !isAdmin(tenantCode) && !!clinicOf(tenantCode)?.pages?.[page]?.filtered

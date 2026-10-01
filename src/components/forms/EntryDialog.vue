@@ -13,7 +13,7 @@
     <template v-else>
       <Message v-if="error" severity="error" class="mb">{{ error }}</Message>
       <div v-if="loading" class="muted">Loading…</div>
-      <FormRenderer v-else :key="round" :fields="fields" :optionsLoader="listOptions" :slotApi="slotApi"
+      <FormRenderer v-else :key="round" :fields="fields" :optionsLoader="listOptions" :slotApi="slotApi" autoFill
                     :staticSource="config.staticSource.value || 'static'"
                     :defaultTextLength="config.limits.value.default_text_length || 255"
                     :defaultPhoneLength="config.limits.value.default_phone_length || 20"

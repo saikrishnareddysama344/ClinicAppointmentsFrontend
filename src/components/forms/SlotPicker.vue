@@ -71,6 +71,10 @@ const clear = () => emit('update:modelValue', null)
 
 async function loadWhos() {
   whos.value = await run('who', () => props.api.options('who', pick.where_id))
+  if (whos.value.length === 1) {   // only one doctor: chosen already (and their times shown)
+    pick.who_id = whos.value[0].id
+    await loadWindows()
+  }
 }
 
 function onWhere() {
@@ -97,9 +101,11 @@ watch(() => props.api, async (api) => {
   if (!api) return
   if (info.value.where) {
     wheres.value = await run('where', () => api.options('where'))
-    // A branch QR poster opens the form with its branch already chosen.
-    if (api.preferredWhere && wheres.value.some((w) => w.id === api.preferredWhere)) {
-      pick.where_id = api.preferredWhere
+    // A branch QR poster (or a role limited to one branch) opens the form with the branch chosen.
+    const only = wheres.value.length === 1 ? wheres.value[0].id : null
+    const preferred = wheres.value.some((w) => w.id === api.preferredWhere) ? api.preferredWhere : only
+    if (preferred) {
+      pick.where_id = preferred
       await loadWhos()
     }
   } else await loadWhos()

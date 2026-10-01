@@ -137,7 +137,9 @@ const props = defineProps({
   // Labels of starting list-dropdown values (a row that is now inactive is not in the options)
   initialLabels: { type: Object, default: () => ({}) },
   // Bump to reload appointment times (e.g. after "this window is full")
-  refreshKey: { type: Number, default: 0 }
+  refreshKey: { type: Number, default: 0 },
+  // Desk entry: a list dropdown with a single choice (e.g. a role limited to one branch) is chosen already
+  autoFill: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['submitted'])
@@ -181,6 +183,10 @@ async function loadOptions(field, initial) {
   if (!isEmpty(value) && !listOptions[field.key].some((o) => o.id === value)) {
     if (initial) listOptions[field.key] = [{ id: value, label: props.initialLabels[field.key] ?? `#${value}` }, ...listOptions[field.key]]
     else values[field.key] = null
+  }
+  // Only one choice (e.g. a role limited to one branch): chosen already.
+  if (props.autoFill && isEmpty(values[field.key]) && listOptions[field.key].length === 1) {
+    values[field.key] = listOptions[field.key][0].id
   }
 }
 

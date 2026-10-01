@@ -90,13 +90,16 @@ const loading = ref(true)
 const GROUPS = [
   { title: 'Front desk', types: ['bookings', 'timings'] },
   { title: 'Form submissions', types: ['form'] },
-  { title: 'List rows', types: ['list'] },
+  { title: 'Lists (rows page, and the values this role can use)', types: ['list'] },
   { title: 'Building forms and lists', types: ['forms', 'lists'] }
 ]
 const groups = computed(() => GROUPS.map((g) => ({ ...g, pages: catalog.value.filter((p) => g.types.includes(p.type)) }))
   .filter((g) => g.pages.length))
-const pageNames = (role) => Object.keys(role.pages || {})
-  .map((key) => catalog.value.find((p) => p.key === key)?.label).filter(Boolean).join(', ')
+const pageNames = (role) => Object.entries(role.pages || {})
+  .map(([key, spec]) => {
+    const label = catalog.value.find((p) => p.key === key)?.label
+    return label && (spec.actions?.length ? label : `${label.replace(/^Rows: /, '')} (values)`)
+  }).filter(Boolean).join(', ')
 
 // Rows of lists for doctor / branch style filters, loaded once each.
 const refRows = reactive({})
@@ -128,8 +131,10 @@ const editor = reactive({ open: false, pages: {} })
 
 function specFor(page, saved) {
   const columns = Object.fromEntries((page.columns || []).map((c) => [c.key, saved?.columns?.[c.key] || 'hidden']))
-  const filter = (saved?.filter || []).map((c) => ({ column: c.column, op: c.op, value: c.value ?? null }))
-  return { on: Boolean(saved), actions: [...(saved?.actions || [])], columns, filter }
+  const conditions = (list) => (list || []).map((c) => ({ column: c.column, op: c.op, value: c.value ?? null }))
+  // A list may limit its values with its Rows page off (no actions, values).
+  return { on: Boolean(saved?.actions?.length), actions: [...(saved?.actions || [])], columns,
+    filter: conditions(saved?.filter), values: conditions(saved?.values) }
 }
 
 function open(role, copy = false) {
@@ -145,12 +150,17 @@ function open(role, copy = false) {
 function payloadPages() {
   const pages = {}
   for (const [key, s] of Object.entries(editor.pages)) {
-    if (!s.on) continue
     const page = catalog.value.find((p) => p.key === key)
+    const done = (list) => list.filter((c) => c.column && c.op)
+    const values = page.type === 'list' ? done(s.values) : []
+    if (!s.on) {
+      if (values.length) pages[key] = { actions: [], values }   // values only, Rows page off
+      continue
+    }
     pages[key] = { actions: s.actions.length ? s.actions : ['view'] }
     if (page.columns) pages[key].columns = s.columns
-    const filter = s.filter.filter((c) => c.column && c.op)
-    if (filter.length) pages[key].filter = filter
+    if (done(s.filter).length) pages[key].filter = done(s.filter)
+    if (values.length) pages[key].values = values
   }
   return pages
 }
