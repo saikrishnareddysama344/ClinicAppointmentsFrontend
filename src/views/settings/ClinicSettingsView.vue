@@ -123,7 +123,8 @@
 
       <template v-else-if="tab === 'Fees & revisits'">
         <p class="hint">A paid consultation is valid for some days and some free (or cheaper) revisits with the
-          same doctor. Another doctor is always a new consultation. Leave a doctor's value empty to use the default.</p>
+          same doctor. Another doctor is always a new consultation. Leave a doctor's value empty to use the default.
+          A timing can have its own OP fee (Doctor timings); then that fee is charged for new consultations in it.</p>
         <Message v-if="!hasBooking" severity="info">Set up booking first to give each doctor their own fee.</Message>
         <div class="table-scroll">
         <table class="fees">

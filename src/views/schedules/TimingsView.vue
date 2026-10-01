@@ -69,6 +69,12 @@
         <Column v-if="schedule?.where_list" field="where" :header="schedule.where_list.name" />
         <Column header="Time"><template #body="{ data }">{{ data.start_time }}–{{ data.end_time }}</template></Column>
         <Column field="max_tokens" header="Max tokens" />
+        <Column header="OP fee">
+          <template #body="{ data }">
+            <span v-if="data.fee != null">{{ rupees(data.fee) }}</span>
+            <span v-else class="muted">Doctor's fee</span>
+          </template>
+        </Column>
         <Column header="Status">
           <template #body="{ data }"><Tag :value="data.status" :severity="data.status === 'active' ? 'success' : 'secondary'" /></template>
         </Column>
@@ -131,6 +137,11 @@
           <label for="w-max">Max tokens</label>
           <InputNumber inputId="w-max" v-model="win.max_tokens" :min="1" :useGrouping="false" fluid />
         </div>
+        <div class="field">
+          <label for="w-fee">OP fee (empty = the doctor's fee in Fees &amp; revisits)</label>
+          <InputNumber inputId="w-fee" v-model="win.fee" :min="0" :maxFractionDigits="2" :useGrouping="false"
+                       placeholder="Doctor's fee" fluid />
+        </div>
       </form>
       <template #footer>
         <Button label="Cancel" severity="secondary" text @click="win.open = false" />
@@ -181,6 +192,7 @@ import { ROUTES } from '@/router'
 import { listsApi, schedulesApi } from '@/services/api'
 import { can, isAdmin, isLimited } from '@/services/auth'
 import { displayValue, toApiValue } from '@/utils/format'
+import { rupees } from '@/utils/visit'
 
 const props = defineProps({ tenantCode: { type: String, required: true } })
 const canDo = (action) => can(props.tenantCode, 'timings', action)
@@ -280,14 +292,14 @@ function editWindow(w) {
   Object.assign(win, { open: true, error: '', id: w?.id || null, who_id: w?.who_id ?? only(options.who),
     where_id: w?.where_id ?? only(options.where),
     weekday: w?.weekday ?? 0, start_time: w?.start_time || '09:00', end_time: w?.end_time || '12:00',
-    max_tokens: w?.max_tokens ?? 20 })
+    max_tokens: w?.max_tokens ?? 20, fee: w?.fee != null ? Number(w.fee) : null })
 }
 
 async function saveWindow() {
   Object.assign(win, { saving: true, error: '' })
   try {
-    const { id, who_id, where_id, weekday, start_time, end_time, max_tokens } = win
-    await schedulesApi.saveWindow(t, slug(), { who_id, where_id, weekday, start_time, end_time, max_tokens }, id)
+    const { id, who_id, where_id, weekday, start_time, end_time, max_tokens, fee } = win
+    await schedulesApi.saveWindow(t, slug(), { who_id, where_id, weekday, start_time, end_time, max_tokens, fee }, id)
     win.open = false
     notify.success('Window saved')
     load()
