@@ -1,6 +1,7 @@
 // Thin fetch wrapper. Every backend response has {status, message, ...};
 // status === false (or a non-2xx code) becomes an ApiError.
 // The login token (set by services/auth.js) goes with every request.
+import { ref } from 'vue'
 import { appConfig } from '@/config/env'
 
 export class ApiError extends Error {
@@ -46,12 +47,48 @@ function holdClicked() {
   }
 }
 
+// Page busy: while a request the user started is waiting for the server (any change, and loads right
+// after a click), App.vue covers the page with a spinner so nothing else can be clicked. Shown after a
+// short moment for loads so quick answers do not flicker; at once for changes.
+export const pageBusy = ref(false)
+let pending = 0
+let showTimer = null
+let hideTimer = null
+let lastDone = 0
+function trackBusy(now = false) {
+  pending++
+  clearTimeout(hideTimer)
+  if (now) pageBusy.value = true   // a change: covered at once
+  if (!showTimer && !pageBusy.value) {
+    showTimer = setTimeout(() => {
+      showTimer = null
+      if (pending) pageBusy.value = true
+    }, 150)
+  }
+  return () => {
+    pending--
+    lastDone = Date.now()
+    if (pending > 0) return
+    clearTimeout(showTimer)
+    showTimer = null
+    // A save is usually followed at once by a reload: keep the cover for that moment.
+    hideTimer = setTimeout(() => {
+      if (!pending) pageBusy.value = false
+    }, 120)
+  }
+}
+// Started by the user: any change, a load within 2 s of a click, or one that follows another user request.
+const userStarted = (method) => method !== 'GET' || pending > 0
+  || Date.now() - lastClick.at < 2000 || Date.now() - lastDone < 300
+
 export async function request(method, path, body) {
   const release = method === 'GET' ? () => {} : holdClicked()
+  const done = userStarted(method) ? trackBusy(method !== 'GET') : () => {}
   try {
     return await send(method, path, body)
   } finally {
     release()
+    done()
   }
 }
 
@@ -86,6 +123,15 @@ async function send(method, path, body) {
 
 // Downloads that need the login token (a plain link cannot send it).
 export async function download(path, fileName) {
+  const done = trackBusy()
+  try {
+    await downloadFile(path, fileName)
+  } finally {
+    done()
+  }
+}
+
+async function downloadFile(path, fileName) {
   const response = await fetch(`${appConfig.apiBaseUrl}${path}`, { headers: authHeader() })
   if (!response.ok) {
     let message = `Download failed (${response.status})`
