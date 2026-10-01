@@ -17,7 +17,45 @@ export const setToken = (value) => (token = value || null)
 export const authHeader = () => (token ? { Authorization: `Bearer ${token}` } : {})
 export const onUnauthorized = (handler) => (unauthorized = handler)
 
+// Double clicks: the button (or menu item) whose click started a change (POST / PUT / DELETE) stays
+// blocked until the server has answered, so the same action cannot be sent twice. Works for every
+// button in the app without changes to the pages.
+const CLICKABLE = 'button, [role="button"], [role="menuitem"], .p-menu-item-link'
+let lastClick = { el: null, at: 0 }
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', (event) => {
+    const el = event.target?.closest?.(CLICKABLE)
+    if (!el) return
+    if (el.dataset.busy) {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      return
+    }
+    lastClick = { el, at: Date.now() }
+  }, true)
+}
+
+function holdClicked() {
+  const { el, at } = lastClick
+  if (!el || Date.now() - at > 1500) return () => {}
+  el.dataset.busy = '1'
+  el.setAttribute('aria-busy', 'true')
+  return () => {
+    delete el.dataset.busy
+    el.removeAttribute('aria-busy')
+  }
+}
+
 export async function request(method, path, body) {
+  const release = method === 'GET' ? () => {} : holdClicked()
+  try {
+    return await send(method, path, body)
+  } finally {
+    release()
+  }
+}
+
+async function send(method, path, body) {
   let response
   try {
     response = await fetch(`${appConfig.apiBaseUrl}${path}`, {

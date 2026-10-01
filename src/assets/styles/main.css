@@ -349,3 +349,9 @@ body {
   padding-top: 0.75rem;
   border-top: 1px solid var(--p-content-border-color);
 }
+
+/* A button whose action is still being saved (see services/http.js): looks busy, ignores clicks. */
+[data-busy] {
+  opacity: 0.6;
+  cursor: progress;
+}
