@@ -12,6 +12,9 @@
         </p>
       </div>
       <div class="actions">
+        <Button v-if="canEntry" label="New entry" icon="pi pi-plus" @click="entryOpen = true" />
+        <SelectButton v-model="sourceFilter" :options="SOURCES" optionLabel="label" optionValue="value"
+                      :allowEmpty="false" aria-label="Booked by" />
         <DatePicker v-model="day" dateFormat="dd/mm/yy" showIcon ariaLabel="Date" @update:modelValue="load" />
         <Button icon="pi pi-refresh" severity="secondary" outlined aria-label="Refresh" :loading="loading" @click="load" />
       </div>
@@ -38,13 +41,26 @@
                 :icon="w.closed ? 'pi pi-replay' : 'pi pi-stop-circle'" size="small" severity="secondary" outlined
                 @click="w.closed ? reopen(w) : endSession(w)" />
       </div>
-      <DataTable :value="w.bookings" dataKey="id" size="small" :rowClass="rowClass">
+      <DataTable :value="shown(w)" dataKey="id" size="small" :rowClass="rowClass">
         <template #empty><span class="muted">No bookings yet.</span></template>
         <Column header="#" style="width: 50px"><template #body="{ data }">{{ position(w, data) }}</template></Column>
         <Column field="token_no" header="Token" style="width: 70px" />
         <Column v-for="col in answerColumns(w)" :key="col.field_id" :header="col.label">
           <template #body="{ data }">{{ answer(data, col) }}</template>
         </Column>
+        <Column header="Visit" style="width: 170px">
+          <template #body="{ data }">
+            <Tag :value="visitLabel(data)" :severity="data.visit_type === 'revisit' ? 'info' : 'secondary'" />
+            <div v-if="data.visit_type === 'revisit' && data.valid_until" class="muted small">
+              valid till {{ displayValue('date', data.valid_until) }}</div>
+          </template>
+        </Column>
+        <Column header="Amount" style="width: 140px">
+          <template #body="{ data }">
+            <span :class="{ due: needsPayment(data) }">{{ data.status === 'cancelled' && data.paid ? 'Paid – cancelled' : amountLabel(data) }}</span>
+          </template>
+        </Column>
+        <Column header="Booked by" style="width: 150px"><template #body="{ data }">{{ data.booked_by_text }}</template></Column>
         <Column header="OP no." style="width: 140px"><template #body="{ data }">{{ data.op_number || '—' }}</template></Column>
         <Column header="Status" style="width: 170px">
           <template #body="{ data }">
@@ -55,15 +71,21 @@
             </template>
           </template>
         </Column>
-        <Column style="width: 210px">
+        <Column style="width: 250px">
           <template #body="{ data }">
             <div v-if="data.status === 'booked'" class="row-actions">
+              <Button v-if="canDo('payment') && needsPayment(data)" icon="pi pi-wallet" text rounded severity="success"
+                      aria-label="Payment received" v-tooltip.top="'Payment received'" @click="paying = data" />
+              <Button v-else-if="canDo('payment') && canDo('change_amount') && data.paid" icon="pi pi-pencil" text rounded
+                      aria-label="Change amount" v-tooltip.top="'Change amount'" @click="paying = data" />
               <template v-if="canDo('queue')">
                 <Button v-for="a in visitActions(data)" :key="a.status" :icon="a.icon" text rounded :severity="a.severity"
                         :aria-label="a.label" v-tooltip.top="a.label" @click="setVisit(data, a.status)" />
               </template>
               <Button v-if="printChoices(data).length" icon="pi pi-print" text rounded aria-label="Print"
-                      v-tooltip.top="'Print'" @click="openPrintMenu($event, data)" />
+                      :disabled="needsPayment(data)"
+                      v-tooltip.top="needsPayment(data) ? 'Mark the payment received first' : 'Print'"
+                      @click="openPrintMenu($event, data)" />
               <Button v-if="canDo('cancel')" icon="pi pi-times" text rounded severity="danger"
                       aria-label="Cancel booking" v-tooltip.top="'Cancel booking'" @click="cancel(data)" />
             </div>
@@ -76,45 +98,28 @@
 
     <Menu ref="printMenu" :model="menuItems" popup />
 
-    <Dialog v-model:visible="bill.open" modal header="Bill" :style="{ width: '460px' }">
-      <p class="muted">Token {{ bill.booking?.token_no }} · {{ bill.booking?.who }}</p>
-      <Message v-if="bill.error" severity="error" class="mb">{{ bill.error }}</Message>
-      <div v-for="(line, i) in bill.lines" :key="i" class="bill-line">
-        <InputText v-model="line.label" placeholder="Item" maxlength="60" :aria-label="`Item ${i + 1}`" class="grow" />
-        <InputNumber v-model="line.amount" :min="0" :maxFractionDigits="2" placeholder="Amount"
-                     :inputId="`bill-amount-${i}`" :ariaLabel="`Amount ${i + 1}`" inputClass="amount" />
-        <Button icon="pi pi-trash" text rounded severity="secondary" :disabled="bill.lines.length === 1"
-                :aria-label="`Remove line ${i + 1}`" @click="bill.lines.splice(i, 1)" />
-      </div>
-      <Button label="Add line" icon="pi pi-plus" text size="small" :disabled="bill.lines.length >= 10"
-              @click="bill.lines.push({ label: '', amount: null })" />
-      <div class="bill-foot">
-        <SelectButton v-model="bill.mode" :options="PAYMENT_MODES" optionLabel="label" optionValue="value"
-                      :allowEmpty="false" aria-label="Payment mode" />
-        <strong>Total {{ billTotal.toFixed(2) }}</strong>
-      </div>
-      <template #footer>
-        <Button v-if="!settings.bill_required || bill.booking?.bill" label="Print without bill" severity="secondary" text
-                @click="doPrint(bill.booking, bill.kinds, null)" />
-        <Button label="Save and print" icon="pi pi-print" :loading="bill.saving"
-                @click="doPrint(bill.booking, bill.kinds, cleanBill())" />
-      </template>
-    </Dialog>
+    <EntryDialog v-model:visible="entryOpen" :tenantCode="tenantCode" @saved="entered" />
+    <PaymentDialog v-if="setup" :tenantCode="tenantCode" :slug="setup.slug" :booking="paying"
+                   :canChange="canDo('change_amount')" @close="paying = null" @paid="paid"
+                   @changed="(b) => { paying = b; load() }" />
   </main>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useConfirm } from 'primevue/useconfirm'
 import { useRoute } from 'vue-router'
+import PaymentDialog from '@/components/bookings/PaymentDialog.vue'
+import EntryDialog from '@/components/forms/EntryDialog.vue'
 import TenantNav from '@/components/layout/TenantNav.vue'
-import { loadClinic } from '@/composables/useClinic'
+import { autoPrintBooking, loadClinic, needsPayment } from '@/composables/useClinic'
 import { useNotify } from '@/composables/useNotify'
 import { ROUTES } from '@/router'
 import { schedulesApi } from '@/services/api'
-import { can, isAdmin } from '@/services/auth'
+import { can, hasPageLike, isAdmin } from '@/services/auth'
 import { displayValue, toApiValue } from '@/utils/format'
 import { printBooking } from '@/utils/print'
+import { amountLabel, visitLabel } from '@/utils/visit'
 
 const props = defineProps({ tenantCode: { type: String, required: true } })
 const t = props.tenantCode
@@ -126,7 +131,8 @@ const VISIT = {
   not_attended: { label: 'not attended', severity: 'warn' },
   done: { label: 'done', severity: 'secondary' }
 }
-const PAYMENT_MODES = ['cash', 'upi', 'card', 'other'].map((value) => ({ value, label: value.toUpperCase() }))
+const SOURCES = [{ value: 'all', label: 'All' }, { value: 'link', label: 'Online' }, { value: 'qr', label: 'QR' },
+  { value: 'staff', label: 'At clinic' }]
 const PRINTS = { receipt: 'Receipt', op: 'OP sheet' }
 
 const notify = useNotify()
@@ -171,6 +177,28 @@ const active = (w) => w.bookings.filter((b) => b.status === 'booked')
 const position = (w, b) => (b.status === 'booked' ? active(w).indexOf(b) + 1 : '')
 const serving = (w) => active(w).find((b) => b.visit_status === 'arrived')
 const rowClass = (b) => (b.status === 'cancelled' || b.visit_status === 'done' ? 'muted' : '')
+const sourceFilter = ref('all')
+const shown = (w) => (sourceFilter.value === 'all' ? w.bookings : w.bookings.filter((b) => b.source === sourceFilter.value))
+
+// ---------- new entry and payment ----------
+const canEntry = computed(() => hasPageLike(t, 'form:', 'add'))
+const entryOpen = ref(false)
+const paying = ref(null)
+
+// After a desk entry: take the payment when something is due, else print if the clinic auto-prints.
+function entered(result) {
+  notify.success(result.booking ? `Token ${result.booking.token_no} booked` : 'Saved')
+  load()
+  if (result.booking && needsPayment(result.booking) && canDo('payment')) paying.value = result.booking
+  else if (result.booking) autoPrintBooking(t, result.booking).catch((e) => notify.error('Could not print', e))
+}
+
+function paid(booking) {
+  paying.value = null
+  notify.success('Payment saved')
+  load()
+  autoPrintBooking(t, booking).catch((e) => notify.error('Could not print', e))
+}
 
 // ---------- queue ----------
 function visitActions(b) {
@@ -263,36 +291,15 @@ function openPrintMenu(event, booking) {
   printMenu.value.toggle(event)
 }
 
-const bill = reactive({ open: false, booking: null, kinds: [], lines: [], mode: 'cash', error: '', saving: false })
-const billTotal = computed(() => bill.lines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0))
+const startPrint = (booking, kinds) => doPrint(booking, kinds)
 
-function startPrint(booking, kinds) {
-  if (kinds.includes('receipt') && canDo('bill') && booking.status === 'booked') {
-    const old = booking.bill
-    Object.assign(bill, { open: true, booking, kinds, error: '', mode: old?.mode || 'cash',
-      lines: old ? old.lines.map((l) => ({ label: l.label, amount: Number(l.amount) })) : [{ label: 'Consultation fee', amount: null }] })
-    return
-  }
-  doPrint(booking, kinds, null)
-}
-
-function cleanBill() {
-  return { mode: bill.mode, lines: bill.lines.filter((l) => l.label || l.amount != null)
-    .map((l) => ({ label: l.label.trim(), amount: l.amount ?? 0 })) }
-}
-
-async function doPrint(booking, kinds, billData) {
-  Object.assign(bill, { saving: true, error: '' })
+async function doPrint(booking, kinds) {
   try {
-    const data = await schedulesApi.print(t, setup.value.slug, booking.id, kinds, billData)
-    bill.open = false
+    const data = await schedulesApi.print(t, setup.value.slug, booking.id, kinds)
     printBooking(data, kinds)
     load()
   } catch (e) {
-    if (bill.open) bill.error = e.message
-    else notify.error('Could not print', e)
-  } finally {
-    bill.saving = false
+    notify.error('Could not print', e)
   }
 }
 
@@ -336,22 +343,13 @@ onMounted(async () => {
   gap: 0.1rem;
 }
 
-.bill-line {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
+.due {
+  color: var(--p-orange-600, #c2410c);
+  font-weight: 600;
 }
 
-.bill-line :deep(.amount) {
-  width: 110px;
-}
-
-.bill-foot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 0.75rem;
+.small {
+  font-size: 0.8rem;
 }
 
 .mb {

@@ -84,10 +84,6 @@
                 <InputNumber inputId="p-rcopies" v-model="form.print.receipt_copies" :min="1" :max="3" showButtons fluid />
               </div>
               <div class="switch-row">
-                <ToggleSwitch v-model="form.print.bill_required" inputId="p-bill" />
-                <label for="p-bill">Bill must be entered before printing</label>
-              </div>
-              <div class="switch-row">
                 <ToggleSwitch v-model="form.print.patient_receipt" inputId="p-patient" />
                 <label for="p-patient">Patients can print / save their receipt after booking online</label>
               </div>
@@ -122,6 +118,38 @@
         <div class="field">
           <label for="p-lang">Extra line on receipts and QR posters (any language)</label>
           <InputText id="p-lang" v-model="form.print.language_line" maxlength="150" fluid />
+        </div>
+      </template>
+
+      <template v-else-if="tab === 'Fees & revisits'">
+        <p class="hint">A paid consultation is valid for some days and some free (or cheaper) revisits with the
+          same doctor. Another doctor is always a new consultation. Leave a doctor's value empty to use the default.</p>
+        <Message v-if="!hasBooking" severity="info">Set up booking first to give each doctor their own fee.</Message>
+        <div class="table-scroll">
+        <table class="fees">
+          <thead>
+            <tr><th>Doctor</th><th>Consultation fee</th><th>Valid days</th><th>Free revisits</th><th>Revisit fee</th>
+              <th>No revisits</th></tr>
+          </thead>
+          <tbody>
+            <tr class="default-row">
+              <td><strong>Clinic default</strong></td>
+              <td v-for="k in FEE_KEYS" :key="k">
+                <InputNumber v-model="form.fees.default[k]" :min="0" :max="FEE_MAX[k]" :useGrouping="false"
+                             :ariaLabel="`Default ${FEE_LABELS[k]}`" inputClass="num" />
+              </td>
+              <td />
+            </tr>
+            <tr v-for="d in form.fees.doctors" :key="d.id">
+              <td>{{ d.label }}</td>
+              <td v-for="k in FEE_KEYS" :key="k">
+                <InputNumber v-model="d[k]" :min="0" :max="FEE_MAX[k]" :useGrouping="false" placeholder="default"
+                             :disabled="d.no_revisits && k !== 'fee'" :ariaLabel="`${d.label} ${FEE_LABELS[k]}`" inputClass="num" />
+              </td>
+              <td><Checkbox v-model="d.no_revisits" binary :inputId="`nr-${d.id}`" :ariaLabel="`${d.label} no revisits`" /></td>
+            </tr>
+          </tbody>
+        </table>
         </div>
       </template>
 
@@ -163,14 +191,17 @@ import { onMounted, reactive, ref } from 'vue'
 import TenantNav from '@/components/layout/TenantNav.vue'
 import { forgetClinic } from '@/composables/useClinic'
 import { useNotify } from '@/composables/useNotify'
-import { clinicApi, rolesApi } from '@/services/api'
+import { clinicApi, listsApi, rolesApi } from '@/services/api'
 import { opSheetHtml, printSheets } from '@/utils/print'
 
 const props = defineProps({ tenantCode: { type: String, required: true } })
 const t = props.tenantCode
 const notify = useNotify()
 
-const TABS = ['Clinic', 'Booking', 'Printing', 'OP sheet']
+const TABS = ['Clinic', 'Booking', 'Fees & revisits', 'Printing', 'OP sheet']
+const FEE_KEYS = ['fee', 'days', 'revisits', 'revisit_fee']
+const FEE_LABELS = { fee: 'consultation fee', days: 'valid days', revisits: 'free revisits', revisit_fee: 'revisit fee' }
+const FEE_MAX = { fee: 10000000, days: 365, revisits: 20, revisit_fee: 10000000 }
 const PRINT_WHAT = [{ value: 'both', label: 'Both' }, { value: 'receipt', label: 'Receipt' }, { value: 'op', label: 'OP sheet' }]
 const tab = ref('Clinic')
 const loading = ref(true)
@@ -181,7 +212,20 @@ const locked = ref(false)
 const hasBooking = ref(false)
 const papers = ref({ receipt: [], op: [] })
 const answerFields = ref([])   // fields of forms with an appointment slot
-const form = reactive({ clinic: {}, booking: {}, print: {}, template: { fields: [], sections: [] } })
+const form = reactive({ clinic: {}, booking: {}, print: {}, template: { fields: [], sections: [] },
+  fees: { default: {}, doctors: [] } })
+const doctors = ref([])   // rows of the booking setup's "who" list
+
+function fillFees(rules) {
+  form.fees = {
+    default: { ...rules.default },
+    doctors: doctors.value.map((d) => {
+      const own = rules.doctors[String(d.id)] || {}
+      return { id: d.id, label: d.label, no_revisits: !!own.no_revisits,
+        ...Object.fromEntries(FEE_KEYS.map((k) => [k, own[k] ?? null])) }
+    })
+  }
+}
 
 function fill(body) {
   const b = body.booking
@@ -196,12 +240,14 @@ function fill(body) {
   locked.value = body.locked
   hasBooking.value = Boolean(b)
   papers.value = body.paper_sizes
+  fillFees(body.fee_rules)
 }
 
 async function load() {
   loading.value = true
   try {
     const [body, catalog] = await Promise.all([clinicApi.setup(t), rolesApi.catalog(t)])
+    doctors.value = body.booking ? (await listsApi.options(t, body.booking.who_list.slug)).options : []
     fill(body)
     answerFields.value = (catalog.pages.find((p) => p.key === 'bookings')?.columns || [])
       .filter((c) => c.key !== 'contact').map((c) => ({ id: Number(c.key), label: c.label }))
@@ -228,6 +274,12 @@ function payload() {
     return { booking: b }
   }
   if (tab.value === 'Printing') return { print_settings: form.print }
+  if (tab.value === 'Fees & revisits') {
+    const own = (d) => Object.fromEntries([...FEE_KEYS.filter((k) => d[k] != null).map((k) => [k, d[k]]),
+      ...(d.no_revisits ? [['no_revisits', true]] : [])])
+    return { fee_rules: { default: form.fees.default,
+      doctors: Object.fromEntries(form.fees.doctors.map((d) => [String(d.id), own(d)])) } }   // {} = use the default
+  }
   return { op_template: form.template }
 }
 
@@ -303,6 +355,30 @@ onMounted(load)
 
 .section-row :deep(.lines) {
   width: 90px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.fees {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.fees th,
+.fees td {
+  text-align: left;
+  padding: 0.35rem 0.4rem;
+  border-bottom: 1px solid var(--p-content-border-color);
+}
+
+.fees :deep(.num) {
+  width: 7rem;
+}
+
+.default-row {
+  background: var(--p-content-hover-background);
 }
 
 .end {

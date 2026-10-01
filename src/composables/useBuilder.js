@@ -51,6 +51,7 @@ export function useBuilder(tenantCode, slug, kind = 'form') {
       // appointment slot
       schedule_id: options.schedule_id ?? null,
       contact_field_id: options.contact_field_id ?? null,
+      name_field_id: options.name_field_id ?? null,
       // hidden on the public form / in the table, or retired (see FieldSettings)
       visibility: { ...VISIBILITY_OFF, ...(apiField.visibility || {}) }
     }
@@ -58,7 +59,8 @@ export function useBuilder(tenantCode, slug, kind = 'form') {
 
   function optionsConfig(field) {
     if (field.data_type === SLOT_TYPE) {
-      return { schedule_id: field.schedule_id, contact_field_id: field.contact_field_id || null }
+      return { schedule_id: field.schedule_id, contact_field_id: field.contact_field_id || null,
+        name_field_id: field.name_field_id || null }
     }
     if (field.data_type !== DROPDOWN_TYPE) return null
     if (field.source === LIST_SOURCE) {
@@ -186,6 +188,7 @@ export function useBuilder(tenantCode, slug, kind = 'form') {
       options: type === DROPDOWN_TYPE ? [...NEW_DROPDOWN_OPTIONS] : [],
       is_display: kind === 'list' && !fields.value.some((f) => f.is_display) && config.isDisplayType(type),
       list_id: null, depends_on_field_id: null, match_field_id: null, schedule_id: null, contact_field_id: null,
+      name_field_id: null,
       visibility: { ...VISIBILITY_OFF }
     }
   }

@@ -45,10 +45,11 @@ export function can(tenantCode, page, action = 'view') {
   return !!clinicOf(tenantCode)?.pages?.[page]?.actions.includes(action)
 }
 
-// Any page whose key starts with prefix ("form:" = some form's submissions).
-export function hasPageLike(tenantCode, prefix) {
+// Any page whose key starts with prefix ("form:" = some form's submissions), optionally with an action.
+export function hasPageLike(tenantCode, prefix, action = null) {
   if (isAdmin(tenantCode)) return true
-  return Object.keys(clinicOf(tenantCode)?.pages || {}).some((key) => key.startsWith(prefix))
+  return Object.entries(clinicOf(tenantCode)?.pages || {})
+    .some(([key, page]) => key.startsWith(prefix) && (!action || page.actions.includes(action)))
 }
 
 // "edit" | "display" | "hidden" for a column of a table page.

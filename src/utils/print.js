@@ -2,6 +2,7 @@
 // printers installed in Windows and with "Save as PDF"). The page is built as plain HTML in a hidden
 // iframe (id "print-frame") so the app's own page is untouched; the frame stays until the next print.
 import { appConfig } from '@/config/env'
+import { visitLabel } from '@/utils/visit'
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
@@ -17,6 +18,9 @@ const money = (value) => Number(value || 0).toLocaleString(appConfig.locale, { m
 const day = (iso) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString(appConfig.locale, { day: '2-digit', month: 'short', year: 'numeric' }) : '')
 const stamp = (iso) => (iso ? new Date(iso).toLocaleString(appConfig.locale, { dateStyle: 'medium', timeStyle: 'short' }) : '')
 const value = (a) => (a.value === true ? 'Yes' : a.value === false ? 'No' : a.value)
+
+// "New consultation" / "Revisit 1 of 2 (valid till 08 Oct 2026)"
+const visitText = (b) => visitLabel(b) + (b.visit_type === 'revisit' && b.valid_until ? ` (valid till ${day(b.valid_until)})` : '')
 
 function header(clinic, compact) {
   return `<div class="clinic ${compact ? 'compact' : ''}">
@@ -40,6 +44,7 @@ export function receiptHtml(data) {
       ${b.where ? `<tr><td>${esc(data.where_label || 'Branch')}</td><td>${esc(b.where)}</td></tr>` : ''}
       <tr><td>Date</td><td>${esc(day(b.date))}</td></tr>
       <tr><td>Time</td><td>${esc(b.start)}–${esc(b.end)}</td></tr>
+      <tr><td>Visit</td><td>${esc(visitText(b))}</td></tr>
       ${data.patient.filter((a) => !a.staff_only).map((a) => `<tr><td>${esc(a.label)}</td><td>${esc(value(a))}</td></tr>`).join('')}
       ${b.op_number ? `<tr><td>OP number</td><td>${esc(b.op_number)}</td></tr>` : ''}
       <tr><td>Booking no.</td><td>${esc(b.id)}</td></tr>
@@ -67,6 +72,10 @@ export function opSheetHtml(data) {
       <div><span class="muted">OP No.</span> <b>${esc(b.op_number || '')}</b></div>
       <div><span class="muted">Token</span> <b>${esc(b.token_no)}</b></div>
       <div><span class="muted">Date</span> ${esc(day(b.date))} ${esc(b.start)}–${esc(b.end)}</div>
+    </div>
+    <div class="op-head">
+      <div><span class="muted">Visit</span> ${esc(visitText(b))}</div>
+      ${b.last_visit ? `<div><span class="muted">Last visit</span> ${esc(day(b.last_visit))}</div>` : ''}
     </div>
     <div class="op-head">
       <div><span class="muted">${esc(data.who_label || 'Doctor')}</span> ${esc(b.who)}</div>

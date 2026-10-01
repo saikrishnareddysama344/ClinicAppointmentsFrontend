@@ -81,6 +81,8 @@ function definitionsApi(kind) {
     updateRow: (t, slug, id, values) => request('PUT', `${one(t, slug)}/${rows}/${id}`, { values }),
     setRowStatus: (t, slug, id, active) => request('PUT', `${one(t, slug)}/${rows}/${id}/status`, { active }),
     options: (t, slug, params) => request('GET', `${one(t, slug)}/options${qs(params)}`),
+    // Desk entry of a form's appointment slot: {part, where_id} | {date, who_id, where_id} | {} (names)
+    slot: (t, slug, fieldId, params) => request('GET', `${one(t, slug)}/fields/${fieldId}/slot${qs(params)}`),
     // Downloaded with the login token (a plain link cannot send it).
     downloadCsv: (t, slug) => download(`${one(t, slug)}/${rows}.csv`, `${slug}-${rows}.csv`)
   }
@@ -111,8 +113,10 @@ export const schedulesApi = (() => {
     cancelBooking: (t, slug, id) => request('PUT', `${one(t, slug)}/bookings/${id}/cancel`),
     // Today's queue: status = arrived | not_attended (to the end of the list) | done | waiting
     setVisit: (t, slug, id, status) => request('PUT', `${one(t, slug)}/bookings/${id}/visit`, { status }),
-    // Record a print and get what to print: kinds = ['receipt', 'op'], bill = {lines, mode} (optional)
-    print: (t, slug, id, kinds, bill) => request('POST', `${one(t, slug)}/bookings/${id}/print`, { kinds, ...(bill ? { bill } : {}) }),
+    // Mark the payment received: {mode} for the amount due, or {mode, lines} to change it
+    pay: (t, slug, id, payload) => request('POST', `${one(t, slug)}/bookings/${id}/payment`, payload),
+    // Record a print (after payment) and get what to print: kinds = ['receipt', 'op']
+    print: (t, slug, id, kinds) => request('POST', `${one(t, slug)}/bookings/${id}/print`, { kinds }),
     endSession: (t, slug, windowId, date) => request('POST', `${one(t, slug)}/sessions`, { window_id: windowId, date }),
     reopenSession: (t, slug, windowId, date) => request('DELETE', `${one(t, slug)}/sessions${qs({ window_id: windowId, date })}`)
   }

@@ -86,7 +86,7 @@ import { useNotify } from '@/composables/useNotify'
 import { autoPrintBooking } from '@/composables/useClinic'
 import { KIND_ROUTES } from '@/router'
 import { SLOT_TYPE } from '@/constants/fieldTypes'
-import { definitionApis, publicApi } from '@/services/api'
+import { definitionApis, listsApi, publicApi } from '@/services/api'
 import { can } from '@/services/auth'
 import { displayValue, rendererField, toApiValue } from '@/utils/format'
 
@@ -110,7 +110,7 @@ const noun = computed(() => (isList.value ? 'row' : 'submission'))
 // from the API already limited to what the role may see (field.access: edit / display).
 const pageKey = computed(() => definition.value && `${props.kind}:${definition.value.id}`)
 const allowed = (action) => !!pageKey.value && can(props.tenantCode, pageKey.value, action)
-const canAdd = computed(() => allowed(isList.value ? 'add' : 'edit'))
+const canAdd = computed(() => allowed('add'))
 const canEdit = computed(() => allowed('edit'))
 const canDeactivate = computed(() => allowed('deactivate'))
 const canExport = computed(() => allowed('export'))
@@ -215,7 +215,8 @@ function openEditor(row) {
 
 function listOptionsFor(field, parentValue) {
   const filter = field.depends_on_field_id ? { filter_field_id: field.match_field_id, filter_value: parentValue } : {}
-  return catalog.listOptions(field.list_id, filter)
+  return field.list_slug ? listsApi.options(props.tenantCode, field.list_slug, filter).then((r) => r.options)
+    : catalog.listOptions(field.list_id, filter)
 }
 
 async function saveRow(answers) {

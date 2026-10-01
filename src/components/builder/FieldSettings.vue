@@ -130,7 +130,14 @@
           <label for="f-contact">One booking per phone number</label>
           <Select id="f-contact" v-model="field.contact_field_id" :options="phoneFields" optionLabel="display_label"
                   optionValue="id" placeholder="(no check)" showClear fluid />
-          <small class="hint">Stops the same phone booking the same person twice on one day. Save new fields first.</small>
+          <small class="hint">Stops the same person booking twice on one day. Save new fields first.</small>
+        </div>
+        <div class="field">
+          <label for="f-name-field">Patient name field</label>
+          <Select id="f-name-field" v-model="field.name_field_id" :options="nameFields" optionLabel="display_label"
+                  optionValue="id" placeholder="(phone only)" showClear fluid />
+          <small class="hint">Phone + name identify the patient: family members on one phone are told apart,
+            revisits and the OP number follow the person.</small>
         </div>
       </template>
     </div>
@@ -170,6 +177,7 @@ const index = computed(() => props.siblings.indexOf(props.field))
 const parents = computed(() => props.siblings.slice(0, Math.max(index.value, 0))
   .filter((f) => f.id && f.data_type === DROPDOWN_TYPE && f.source === LIST_SOURCE && f.list_id))
 const phoneFields = computed(() => props.siblings.filter((f) => f.id && f.data_type === 'phone'))
+const nameFields = computed(() => props.siblings.filter((f) => f.id && f.data_type === 'string'))
 const scheduleParts = computed(() => {
   const s = props.schedules.find((x) => x.id === props.field?.schedule_id) || props.schedules[0]
   return s ? [s.where_list?.name, s.who_list.name].filter(Boolean).join(', ') : 'who (and where)'

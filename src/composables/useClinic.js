@@ -16,13 +16,16 @@ export function loadClinic(code) {
 
 export const forgetClinic = (code) => delete cache[code]
 
-// After staff add a booking: print right away when the clinic turned on auto-print (what the
-// clinic prints first, only what this role may print; a receipt waiting for a bill is left out).
+// A booking can be printed once its payment is marked, or straight away when nothing is due.
+export const needsPayment = (booking) => booking?.status !== 'cancelled' && !booking?.paid && Number(booking?.fee_due || 0) > 0
+
+// After staff add a booking (or mark its payment): print right away when the clinic turned on
+// auto-print (what the clinic prints first, only what this role may print, only once nothing is due).
 export async function autoPrintBooking(code, booking) {
   const clinic = await loadClinic(code)
   const s = clinic.print_settings || {}
-  if (!s.auto_print || !clinic.booking || !booking) return
-  const kinds = [s.print_what !== 'op' && s.receipt && !s.bill_required && can(code, 'bookings', 'print_receipt') && 'receipt',
+  if (!s.auto_print || !clinic.booking || !booking || needsPayment(booking)) return
+  const kinds = [s.print_what !== 'op' && s.receipt && can(code, 'bookings', 'print_receipt') && 'receipt',
     s.print_what !== 'receipt' && s.op_sheet && can(code, 'bookings', 'print_op') && 'op'].filter(Boolean)
   if (kinds.length) printBooking(await schedulesApi.print(code, clinic.booking.slug, booking.id, kinds), kinds)
 }

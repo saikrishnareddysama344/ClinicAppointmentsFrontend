@@ -32,6 +32,14 @@
             <span class="token-no">{{ booking.token_no }}</span>
             <span>{{ [booking.who, booking.where].filter(Boolean).join(' · ') }}</span>
             <span>{{ displayValue('date', booking.date) }}, {{ booking.start }}–{{ booking.end }}</span>
+            <span class="visit-line">
+              <template v-if="booking.visit_type === 'revisit'">
+                Review visit ({{ visitLabel(booking).toLowerCase() }}) –
+                {{ Number(booking.fee_due) > 0 ? `fee ${rupees(booking.fee_due)}` : 'no consultation fee' }}<template
+                  v-if="booking.valid_until">, valid till {{ displayValue('date', booking.valid_until) }}</template>
+              </template>
+              <template v-else-if="Number(booking.fee_due) > 0">Consultation fee {{ rupees(booking.fee_due) }}, pay at the clinic</template>
+            </span>
           </div>
           <Button v-if="booking?.receipt_code" label="Print / save receipt" icon="pi pi-print" class="mb"
                   :loading="printing" @click="printReceipt" />
@@ -75,6 +83,7 @@ import FormRenderer from '@/components/forms/FormRenderer.vue'
 import { publicApi } from '@/services/api'
 import { displayValue, rendererField, toApiValue } from '@/utils/format'
 import { printBooking } from '@/utils/print'
+import { rupees, visitLabel } from '@/utils/visit'
 
 const props = defineProps({
   tenantCode: { type: String, required: true },
@@ -256,6 +265,10 @@ onMounted(load)
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--p-text-muted-color);
+}
+
+.visit-line {
+  font-weight: 600;
 }
 
 .token-no {

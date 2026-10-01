@@ -63,7 +63,7 @@ export function rendererField(f) {
     is_mandatory: f.is_mandatory === true || f.is_mandatory === 'Y', max_length: f.max_length,
     placeholder: f.placeholder || '', help_text: f.help_text || '',
     source: f.source || o.source || 'static', options: f.options || o.options || [],
-    list_id: o.list_id ?? null, match_field_id: o.match_field_id ?? null,
+    list_id: o.list_id ?? null, list_slug: f.list_slug ?? null, match_field_id: o.match_field_id ?? null,
     depends_on_field_id: f.depends_on_field_id ?? o.depends_on_field_id ?? null,
     slot: f.slot || null
   }
