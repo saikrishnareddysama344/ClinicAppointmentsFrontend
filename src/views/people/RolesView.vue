@@ -8,7 +8,8 @@
         <p class="sub">A role says which pages someone sees, which buttons they get, which columns they can see
           or change and which rows. Give roles to users on the Users tab; several roles add up.</p>
       </div>
-      <Button label="New role" icon="pi pi-plus" @click="open(null)" />
+      <!-- the editor is built from the page catalog: wait for it -->
+      <Button label="New role" icon="pi pi-plus" :disabled="loading" @click="open(null)" />
     </div>
 
     <div class="panel">
@@ -56,7 +57,20 @@
         <div v-for="group in groups" :key="group.title" class="group">
           <div class="group-title">{{ group.title }}</div>
           <PageAccessEditor v-for="p in group.pages" :key="p.key" :page="p" :spec="editor.pages[p.key]"
-                            :operators="operators" :refOptions="refOptions" />
+                            :operators="operators" :refOptions="refOptions">
+            <div v-if="p.key === 'bookings' && slotForms.length" class="part">
+              <div class="part-title">New entry (walk-ins, phone bookings)</div>
+              <div class="checks">
+                <div v-for="f in slotForms" :key="f.key" class="check">
+                  <Checkbox :modelValue="canEnter(f)" binary :inputId="`entry-${f.key.replace(':', '-')}`"
+                            @update:modelValue="setEntry(f, $event)" />
+                  <label :for="`entry-${f.key.replace(':', '-')}`">{{ slotForms.length > 1 ? f.label.replace(/^Submissions: /, '') : 'New entry' }}</label>
+                </div>
+              </div>
+              <small class="hint">Lets this role add bookings from the Bookings page with the same form patients use
+                (its required fields become editable).</small>
+            </div>
+          </PageAccessEditor>
         </div>
         <small class="hint">Columns left hidden never reach this role's screens, downloads or printouts.
           New columns added later start hidden.</small>
@@ -95,6 +109,19 @@ const GROUPS = [
 ]
 const groups = computed(() => GROUPS.map((g) => ({ ...g, pages: catalog.value.filter((p) => g.types.includes(p.type)) }))
   .filter((g) => g.pages.length))
+// Forms with an appointment slot: "New entry" on Bookings adds to them (Add on that form's Submissions).
+const slotForms = computed(() => catalog.value.filter((p) => p.type === 'form' && p.columns?.some((c) => c.slot)))
+const canEnter = (form) => editor.pages[form.key]?.on && editor.pages[form.key].actions.includes('add')
+function setEntry(form, on) {
+  const spec = editor.pages[form.key]
+  if (on) {
+    spec.on = true
+    spec.actions = [...new Set([...spec.actions, 'view', 'add'])]
+    form.columns.filter((c) => c.required).forEach((c) => { spec.columns[c.key] = 'edit' })
+  } else {
+    spec.actions = spec.actions.filter((a) => a !== 'add')
+  }
+}
 const pageNames = (role) => Object.entries(role.pages || {})
   .map(([key, spec]) => {
     const label = catalog.value.find((p) => p.key === key)?.label
@@ -219,6 +246,25 @@ onMounted(load)
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.part-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--p-text-muted-color);
+  margin-bottom: 0.4rem;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.2rem;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .group-title {

@@ -18,6 +18,13 @@
         </div>
       </div>
 
+      <slot />
+
+      <Message v-if="needsEditable.length" severity="warn" size="small" class="needs">
+        Adding entries needs these columns editable: {{ needsEditable.map((c) => c.label).join(', ') }}.
+        <Button label="Make them editable" text size="small" @click="makeEditable" />
+      </Message>
+
       <div v-if="page.columns?.length" class="part">
         <div class="part-title">
           Columns
@@ -76,6 +83,11 @@ const summary = computed(() => {
   return parts.join(' · ')
 })
 
+// With Add, every required column (and the appointment slot) must be editable, or the server refuses the role.
+const needsEditable = computed(() => (props.spec.actions.includes('add')
+  ? (props.page.columns || []).filter((c) => c.required && props.spec.columns[c.key] !== 'edit') : []))
+const makeEditable = () => needsEditable.value.forEach((c) => { props.spec.columns[c.key] = 'edit' })
+
 function switched(on) {
   if (on && !props.spec.actions.length) props.spec.actions = ['view']
 }
@@ -102,6 +114,10 @@ const setAll = (level) => props.page.columns.forEach((c) => { props.spec.columns
 
 .page-name {
   font-weight: 600;
+}
+
+.needs {
+  margin: 0;
 }
 
 .filter-part {
