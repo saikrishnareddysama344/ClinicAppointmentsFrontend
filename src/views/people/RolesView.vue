@@ -129,6 +129,7 @@ const GROUPS = [
 const groups = computed(() => GROUPS.map((g) => ({ ...g, pages: catalog.value.filter((p) => g.types.includes(p.type)) }))
   .filter((g) => g.pages.length))
 const pageNames = (role) => Object.entries(role.pages || {})
+  .filter(([key]) => key !== 'overview')   // info columns only: not a page the role opens
   .map(([key, spec]) => {
     const label = catalog.value.find((p) => p.key === key)?.label
     return label && (spec.actions?.length ? label : `${label.replace(/^Rows: /, '')} (values)`)
