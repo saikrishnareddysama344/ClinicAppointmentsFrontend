@@ -88,6 +88,11 @@ const routes = [
   // Public page for patients: no admin header, no login.
   { path: '/f/:tenantCode/:formSlug', name: ROUTES.PUBLIC_FORM, props: true, meta: { title: 'Form', public: true },
     component: () => import('@/views/public/PublicFormView.vue') },
+  // Live queue (no login): a patient's own token and the clinic's lobby screen
+  { path: '/q/:tenantCode/:code', name: 'my-token', props: true, meta: { title: 'Your token', public: true },
+    component: () => import('@/views/public/QueueView.vue') },
+  { path: '/tv/:tenantCode/:screenKey', name: 'lobby', props: true, meta: { title: 'Queue', public: true },
+    component: () => import('@/views/public/LobbyView.vue') },
   { path: '/:pathMatch(.*)*', redirect: { name: ROUTES.TENANTS } }
 ]
 

@@ -67,6 +67,16 @@
           <ToggleSwitch v-model="form.booking.is_active" inputId="b-active" />
           <label for="b-active">Booking open (switch off to stop all new bookings)</label>
         </div>
+        <div v-if="hasBooking" class="field">
+          <label>Lobby screen (a TV in the waiting room)</label>
+          <div v-if="screenUrl" class="row-inline">
+            <a :href="screenUrl" target="_blank" class="mono">{{ screenUrl }}</a>
+            <Button label="New link" icon="pi pi-refresh" text size="small" @click="renewScreen" />
+          </div>
+          <Button v-else label="Show screen link" icon="pi pi-desktop" text size="small" @click="loadScreen" />
+          <small class="hint">Shows each doctor's token being served and the next ones, no names. Open it on the TV;
+            add ?branch=… by choosing a branch on the screen. "New link" stops the old one.</small>
+        </div>
       </template>
 
       <template v-else-if="tab === 'Printing'">
@@ -208,6 +218,24 @@ const FEE_LABELS = { fee: 'consultation fee', days: 'valid days', revisits: 'fre
 const FEE_MAX = { fee: 10000000, days: 365, revisits: 20, revisit_fee: 10000000 }
 const PRINT_WHAT = [{ value: 'both', label: 'Both' }, { value: 'receipt', label: 'Receipt' }, { value: 'op', label: 'OP sheet' }]
 const tab = ref('Clinic')
+
+// Lobby screen link (secret key)
+const screenUrl = ref('')
+async function loadScreen() {
+  try {
+    screenUrl.value = `${window.location.origin}/tv/${props.tenantCode}/${(await clinicApi.screenKey(props.tenantCode)).key}`
+  } catch (e) {
+    notify.error('Could not get the screen link', e)
+  }
+}
+async function renewScreen() {
+  try {
+    screenUrl.value = `${window.location.origin}/tv/${props.tenantCode}/${(await clinicApi.renewScreenKey(props.tenantCode)).key}`
+    notify.success('New screen link made', 'The old link no longer works.')
+  } catch (e) {
+    notify.error('Could not make a new link', e)
+  }
+}
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')

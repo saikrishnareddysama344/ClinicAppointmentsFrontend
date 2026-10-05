@@ -41,8 +41,10 @@
               <template v-else-if="Number(booking.fee_due) > 0">Consultation fee {{ rupees(booking.fee_due) }}, pay at the clinic</template>
             </span>
           </div>
+          <Button v-if="booking?.receipt_code" as="a" :href="`/q/${tenantCode}/${booking.receipt_code}`" target="_blank"
+                  label="Track your turn live" icon="pi pi-clock" class="mb" />
           <Button v-if="booking?.receipt_code" label="Print / save receipt" icon="pi pi-print" class="mb"
-                  :loading="printing" @click="printReceipt" />
+                  severity="secondary" :loading="printing" @click="printReceipt" />
           <Message v-if="receiptError" severity="warn" class="mb">{{ receiptError }}</Message>
           <Button label="Submit another response" severity="secondary" outlined @click="startAgain" />
         </div>

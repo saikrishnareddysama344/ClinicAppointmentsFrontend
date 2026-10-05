@@ -44,7 +44,16 @@ export const usersApi = (() => {
 export const clinicApi = {
   info: (t) => request('GET', `/v1/tenants/${enc(t)}/clinic`),          // any member
   setup: (t) => request('GET', `/v1/tenants/${enc(t)}/setup`),          // admins (adds the lists)
-  saveSetup: (t, payload) => request('PUT', `/v1/tenants/${enc(t)}/setup`, payload)
+  saveSetup: (t, payload) => request('PUT', `/v1/tenants/${enc(t)}/setup`, payload),
+  // The lobby screen's secret link key (admins); renew makes a new one
+  screenKey: (t) => request('GET', `/v1/tenants/${enc(t)}/screen`),
+  renewScreenKey: (t) => request('POST', `/v1/tenants/${enc(t)}/screen`)
+}
+
+// Live queue pages (no login): a patient's own token, and the lobby screen
+export const queueApi = {
+  myToken: (t, code) => request('GET', `/v1/queue/${enc(t)}/${enc(code)}`),
+  screen: (t, key, branch) => request('GET', `/v1/screen/${enc(t)}/${enc(key)}${branch ? `?branch=${enc(branch)}` : ''}`)
 }
 
 // WhatsApp / SMS settings: tenantCode = a clinic's (own accounts + message settings), none = the platform's
