@@ -111,7 +111,7 @@ const loadOptions = async (field, parentValue) =>
 // A QR poster's link says where it came from (src=qr) and may choose the branch (branch=<id>).
 const route = useRoute()
 const source = route.query.src === 'qr' ? 'qr' : 'link'
-const preferredWhere = Number(route.query.branch) || null
+const preferredWhere = route.query.branch || null   // a branch's public id (QR poster)
 const slotApi = (field) => ({
   preferredWhere,
   options: async (part, whereId) =>

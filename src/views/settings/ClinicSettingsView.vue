@@ -251,7 +251,7 @@ async function load() {
     doctors.value = body.booking ? (await listsApi.options(t, body.booking.who_list.slug)).options : []
     fill(body)
     answerFields.value = (catalog.pages.find((p) => p.key === 'bookings')?.columns || [])
-      .filter((c) => c.key !== 'contact').map((c) => ({ id: Number(c.key), label: c.label }))
+      .filter((c) => c.key !== 'contact').map((c) => ({ id: c.key, label: c.label }))
   } catch (e) {
     notify.error('Could not load the settings', e)
   } finally {
