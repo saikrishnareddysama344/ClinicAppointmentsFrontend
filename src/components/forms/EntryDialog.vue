@@ -29,7 +29,6 @@ import { computed, ref, watch } from 'vue'
 import FormRenderer from '@/components/forms/FormRenderer.vue'
 import { useBuilderConfig } from '@/composables/useBuilderConfig'
 import { formsApi, listsApi } from '@/services/api'
-import { can } from '@/services/auth'
 import { rendererField, toApiValue } from '@/utils/format'
 
 // Staff fill a form the way patients do (no builder): the forms this role may add to, then the form.
@@ -71,8 +70,7 @@ watch(() => props.visible, async (shown) => {
   loading.value = true
   try {
     await config.load()
-    forms.value = (await formsApi.list(t)).forms
-      .filter((f) => f.status !== 'draft' && can(t, `form:${f.id}`, 'add'))
+    forms.value = (await formsApi.forEntry(t)).forms.filter((f) => f.status !== 'draft')
     if (forms.value.length === 1) await open(forms.value[0])
   } catch (e) {
     error.value = e.message

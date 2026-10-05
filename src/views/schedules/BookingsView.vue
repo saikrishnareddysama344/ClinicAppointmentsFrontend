@@ -152,7 +152,7 @@ import { autoPrintBooking, loadClinic, needsPayment } from '@/composables/useCli
 import { useNotify } from '@/composables/useNotify'
 import { ROUTES } from '@/router'
 import { schedulesApi } from '@/services/api'
-import { can, hasPageLike, isAdmin } from '@/services/auth'
+import { can, entryForms, hasPageLike, isAdmin } from '@/services/auth'
 import { displayValue, toApiValue } from '@/utils/format'
 import { printBooking } from '@/utils/print'
 import { amountLabel, visitLabel } from '@/utils/visit'
@@ -219,7 +219,7 @@ const sourceFilter = ref('all')
 const shown = (w) => (sourceFilter.value === 'all' ? w.bookings : w.bookings.filter((b) => b.source === sourceFilter.value))
 
 // ---------- new entry and payment ----------
-const canEntry = computed(() => hasPageLike(t, 'form:', 'add'))
+const canEntry = computed(() => hasPageLike(t, 'form:', 'add') || entryForms(t).length > 0)
 const entryOpen = ref(false)
 const paying = ref(null)
 

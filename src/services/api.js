@@ -72,6 +72,8 @@ function definitionsApi(kind) {
   const one = (t, slug) => `${base(t)}/${enc(slug)}`
   return {
     list: (t) => request('GET', base(t)),
+    // forms only: the ones the user may add to (their rows page, or New entry on Bookings)
+    forEntry: (t) => request('GET', `${base(t)}?for=entry`),
     create: (t, payload) => request('POST', base(t), payload),
     get: (t, slug) => request('GET', one(t, slug)),
     save: (t, slug, payload) => request('PUT', one(t, slug), payload),

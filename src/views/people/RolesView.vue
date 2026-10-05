@@ -65,17 +65,15 @@
           <div class="group-title">{{ group.title }}</div>
           <PageAccessEditor v-for="p in group.pages" :key="p.key" :page="p" :spec="editor.pages[p.key]"
                             :operators="operators" :refOptions="refOptions">
-            <div v-if="p.key === 'bookings' && slotForms.length" class="part">
-              <div class="part-title">New entry (walk-ins, phone bookings)</div>
+            <div v-if="p.key === 'bookings' && p.entry_forms?.length" class="part">
+              <div class="part-title">New entry forms (walk-ins, phone bookings)</div>
               <div class="checks">
-                <div v-for="f in slotForms" :key="f.key" class="check">
-                  <Checkbox :modelValue="canEnter(f)" binary :inputId="`entry-${f.key.replace(':', '-')}`"
-                            @update:modelValue="setEntry(f, $event)" />
-                  <label :for="`entry-${f.key.replace(':', '-')}`">{{ slotForms.length > 1 ? f.label.replace(/^Submissions: /, '') : 'New entry' }}</label>
+                <div v-for="f in p.entry_forms" :key="f.id" class="check">
+                  <Checkbox v-model="editor.pages.bookings.entry_forms" :value="f.id" :inputId="`entry-${f.id}`" />
+                  <label :for="`entry-${f.id}`">{{ f.label }}</label>
                 </div>
               </div>
-              <small class="hint">Lets this role add bookings from the Bookings page with the same form patients use
-                (its required fields become editable).</small>
+              <small class="hint">New entry on Bookings shows these forms. This does not open their Submissions pages.</small>
             </div>
           </PageAccessEditor>
         </div>
@@ -118,19 +116,6 @@ const GROUPS = [
 ]
 const groups = computed(() => GROUPS.map((g) => ({ ...g, pages: catalog.value.filter((p) => g.types.includes(p.type)) }))
   .filter((g) => g.pages.length))
-// Forms with an appointment slot: "New entry" on Bookings adds to them (Add on that form's Submissions).
-const slotForms = computed(() => catalog.value.filter((p) => p.type === 'form' && p.columns?.some((c) => c.slot)))
-const canEnter = (form) => editor.pages[form.key]?.on && editor.pages[form.key].actions.includes('add')
-function setEntry(form, on) {
-  const spec = editor.pages[form.key]
-  if (on) {
-    spec.on = true
-    spec.actions = [...new Set([...spec.actions, 'view', 'add'])]
-    form.columns.filter((c) => c.required).forEach((c) => { spec.columns[c.key] = 'edit' })
-  } else {
-    spec.actions = spec.actions.filter((a) => a !== 'add')
-  }
-}
 const pageNames = (role) => Object.entries(role.pages || {})
   .map(([key, spec]) => {
     const label = catalog.value.find((p) => p.key === key)?.label
@@ -172,7 +157,8 @@ function specFor(page, saved) {
   const conditions = (list) => (list || []).map((c) => ({ column: c.column, op: c.op, value: c.value ?? null }))
   // A list may limit its values with its Rows page off (no actions, values).
   return { on: Boolean(saved?.actions?.length), actions: [...(saved?.actions || [])], columns,
-    filter: conditions(saved?.filter), values: conditions(saved?.values) }
+    filter: conditions(saved?.filter), values: conditions(saved?.values),
+    entry_forms: (saved?.entry_forms || []).filter((id) => page.entry_forms?.some((f) => f.id === id)) }
 }
 
 function open(role, copy = false) {
@@ -208,6 +194,7 @@ function payloadPages() {
     pages[key] = { actions: s.actions.length ? s.actions : ['view'] }
     if (page.columns) pages[key].columns = s.columns
     if (done(s.filter).length) pages[key].filter = done(s.filter)
+    if (s.entry_forms?.length) pages[key].entry_forms = s.entry_forms
     if (values.length) pages[key].values = values
   }
   return pages

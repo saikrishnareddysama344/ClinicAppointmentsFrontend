@@ -52,6 +52,9 @@ export function hasPageLike(tenantCode, prefix, action = 'view') {
     .some(([key, page]) => key.startsWith(prefix) && page.actions.includes(action))
 }
 
+// Forms New entry on Bookings may use without their Submissions page (the roles' bookings "entry_forms").
+export const entryForms = (tenantCode) => clinicOf(tenantCode)?.pages?.bookings?.entry_forms || []
+
 // Do the user's roles limit which values of a list (e.g. which branches) they may use?
 export const isLimited = (tenantCode, listId) => !isAdmin(tenantCode)
   && !!clinicOf(tenantCode)?.limited_lists?.includes(`list:${listId}`)
