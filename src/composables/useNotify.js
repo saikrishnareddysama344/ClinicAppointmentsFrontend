@@ -9,6 +9,7 @@ export function useNotify() {
   return {
     success: (summary, detail) => toast.add({ severity: 'success', summary, detail, life }),
     info: (summary, detail) => toast.add({ severity: 'info', summary, detail, life }),
+    warn: (summary, detail) => toast.add({ severity: 'warn', summary, detail, life: life * 2 }),
     error: (summary, error) => toast.add({
       severity: 'error', summary, detail: error?.message || String(error || ''), life: life * 1.5
     })
