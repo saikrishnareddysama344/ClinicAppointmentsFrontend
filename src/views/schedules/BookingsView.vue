@@ -185,12 +185,14 @@ const canEntry = computed(() => hasPageLike(t, 'form:', 'add'))
 const entryOpen = ref(false)
 const paying = ref(null)
 
-// After a desk entry: take the payment when something is due, else print if the clinic auto-prints.
+// After a desk entry: just the token; payment is taken from the booking's row. A free visit prints at once
+// if the clinic auto-prints (with something due, printing waits for the payment).
 function entered(result) {
   notify.success(result.booking ? `Token ${result.booking.token_no} booked` : 'Saved')
   load()
-  if (result.booking && needsPayment(result.booking) && canDo('payment')) paying.value = result.booking
-  else if (result.booking) autoPrintBooking(t, result.booking).catch((e) => notify.error('Could not print', e))
+  if (result.booking && !needsPayment(result.booking)) {
+    autoPrintBooking(t, result.booking).catch((e) => notify.error('Could not print', e))
+  }
 }
 
 function paid(booking) {
