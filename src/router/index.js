@@ -17,7 +17,8 @@ export const ROUTES = Object.freeze({
   ROLES: 'roles',
   LOGIN: 'login',
   PASSWORD: 'password',
-  PUBLIC_FORM: 'public-form'
+  PUBLIC_FORM: 'public-form',
+  MESSAGING: 'messaging'
 })
 
 // The tabs of a clinic, in order, and who may open each (TenantNav shows the allowed ones, and
@@ -63,6 +64,8 @@ const routes = [
   { path: '/', name: 'home', component: { render: () => null } },
   { path: '/tenants', name: ROUTES.TENANTS, component: () => import('@/views/tenants/TenantsView.vue'),
     meta: { title: 'Tenants' } },
+  { path: '/messaging', name: ROUTES.MESSAGING, component: () => import('@/views/settings/MessagingView.vue'),
+    meta: { title: 'Messaging' } },
   ...kindRoutes('form', 'forms', 'Forms'),
   ...kindRoutes('list', 'lists', 'Lists'),
   { path: `${tenant}/timings`, name: ROUTES.TIMINGS, props: true, meta: { title: 'Doctor timings' },

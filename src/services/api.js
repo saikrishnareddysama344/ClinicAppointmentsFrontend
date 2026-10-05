@@ -47,6 +47,17 @@ export const clinicApi = {
   saveSetup: (t, payload) => request('PUT', `/v1/tenants/${enc(t)}/setup`, payload)
 }
 
+// WhatsApp / SMS settings: tenantCode = a clinic's (own accounts + message settings), none = the platform's
+export const messagingApi = (() => {
+  const base = (t) => (t ? `/v1/tenants/${enc(t)}/messaging` : '/v1/messaging')
+  return {
+    get: (t) => request('GET', base(t)),
+    save: (t, payload) => request('PUT', base(t), payload),
+    test: (t, phone) => request('POST', `${base(t)}/test`, { phone }),
+    log: (t) => request('GET', `${base(t)}/log`)
+  }
+})()
+
 export const rolesApi = (() => {
   const base = (t) => `/v1/tenants/${enc(t)}/roles`
   return {

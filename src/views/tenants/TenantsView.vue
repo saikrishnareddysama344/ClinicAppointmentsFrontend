@@ -6,7 +6,10 @@
         <p class="sub">{{ isPlatformAdmin ? 'Each tenant is a clinic business with its own database schema.'
           : 'The clinics you work in.' }}</p>
       </div>
-      <Button v-if="isPlatformAdmin" label="New tenant" icon="pi pi-plus" @click="openCreate" />
+      <div v-if="isPlatformAdmin" class="head-actions">
+        <Button label="Messaging" icon="pi pi-comments" severity="secondary" outlined @click="router.push({ name: ROUTES.MESSAGING })" />
+        <Button label="New tenant" icon="pi pi-plus" @click="openCreate" />
+      </div>
     </div>
 
     <div class="panel">
@@ -142,3 +145,10 @@ function openTenant(tenant) {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.head-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+</style>

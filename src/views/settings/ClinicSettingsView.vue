@@ -12,6 +12,8 @@
 
     <div v-if="loading" class="panel empty">Loading…</div>
 
+    <MessagingSettings v-else-if="tab === 'Messages'" :tenantCode="tenantCode" />
+
     <form v-else class="panel form-grid settings" @submit.prevent="save">
       <Message v-if="error" severity="error">{{ error }}</Message>
 
@@ -190,6 +192,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import TenantNav from '@/components/layout/TenantNav.vue'
+import MessagingSettings from '@/components/messaging/MessagingSettings.vue'
 import { forgetClinic } from '@/composables/useClinic'
 import { useNotify } from '@/composables/useNotify'
 import { clinicApi, listsApi, rolesApi } from '@/services/api'
@@ -199,7 +202,7 @@ const props = defineProps({ tenantCode: { type: String, required: true } })
 const t = props.tenantCode
 const notify = useNotify()
 
-const TABS = ['Clinic', 'Booking', 'Fees & revisits', 'Printing', 'OP sheet']
+const TABS = ['Clinic', 'Booking', 'Fees & revisits', 'Printing', 'OP sheet', 'Messages']
 const FEE_KEYS = ['fee', 'days', 'revisits', 'revisit_fee']
 const FEE_LABELS = { fee: 'consultation fee', days: 'valid days', revisits: 'free revisits', revisit_fee: 'revisit fee' }
 const FEE_MAX = { fee: 10000000, days: 365, revisits: 20, revisit_fee: 10000000 }
