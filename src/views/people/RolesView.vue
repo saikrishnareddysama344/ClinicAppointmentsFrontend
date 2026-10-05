@@ -44,6 +44,13 @@
             :style="{ width: '860px' }" :breakpoints="{ '900px': '96vw' }">
       <Message v-if="editor.error" severity="error" class="mb">{{ editor.error }}</Message>
       <div class="form-grid">
+        <div v-if="!editor.id && !editor.copy" class="field">
+          <label for="role-template">Start from</label>
+          <Select v-model="editor.template" inputId="role-template" ariaLabel="Start from" :options="templateOptions" optionLabel="label"
+                  optionValue="key" fluid @update:modelValue="useTemplate" />
+          <small class="hint">A template fills in the pages, buttons and columns below for this clinic. Change anything
+            before saving.</small>
+        </div>
         <div class="row-inline">
           <div class="field grow">
             <label for="role-name">Name<span class="required-star">*</span></label>
@@ -98,6 +105,8 @@ const confirm = useConfirm()
 
 const roles = ref([])
 const catalog = ref([])
+const templates = ref([])
+const templateOptions = computed(() => [{ key: '', label: 'Blank' }, ...templates.value])
 const operators = ref({})
 const loading = ref(true)
 
@@ -142,9 +151,11 @@ function refOptions(slug) {
 async function load() {
   loading.value = true
   try {
-    const [r, c] = await Promise.all([rolesApi.list(t), rolesApi.catalog(t)])
+    const [r, c, tp] = await Promise.all([rolesApi.list(t), rolesApi.catalog(t),
+      rolesApi.templates(t).catch(() => ({ templates: [] }))])   // templates are a convenience
     roles.value = r.roles
     catalog.value = c.pages
+    templates.value = tp.templates
     operators.value = c.operators
   } catch (e) {
     notify.error('Could not load roles', e)
@@ -167,11 +178,21 @@ function specFor(page, saved) {
 function open(role, copy = false) {
   Object.assign(editor, {
     open: true, error: '', saving: false,
-    id: copy ? null : role?.id || null,
+    id: copy ? null : role?.id || null, template: '', copy,
     name: role ? (copy ? `Copy of ${role.name}` : role.name) : '',
     description: role?.description || '',
     pages: Object.fromEntries(catalog.value.map((p) => [p.key, specFor(p, role?.pages?.[p.key])]))
   })
+}
+
+// Start from a template: its pages replace what is in the editor (name and description too, if still empty).
+function useTemplate(key) {
+  const template = templates.value.find((x) => x.key === key)
+  const previous = templates.value.find((x) => x.label === editor.name.trim())
+  if (previous && previous !== template) Object.assign(editor, { name: '', description: '' })   // its name, not the admin's
+  editor.pages = Object.fromEntries(catalog.value.map((p) => [p.key, specFor(p, template?.pages[p.key])]))
+  if (template && !editor.name.trim()) editor.name = template.label
+  if (template && !editor.description.trim()) editor.description = template.description
 }
 
 function payloadPages() {
