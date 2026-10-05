@@ -52,6 +52,11 @@ export function hasPageLike(tenantCode, prefix, action = 'view') {
     .some(([key, page]) => key.startsWith(prefix) && page.actions.includes(action))
 }
 
+// Info columns of the Lists / Forms pages this user sees (field_count, status, updated). Admins and builders
+// see all; a role saved before the setting existed also does (the server says so).
+export const seesOverview = (tenantCode, column) => isAdmin(tenantCode) || can(tenantCode, 'forms') || can(tenantCode, 'lists')
+  || !!clinicOf(tenantCode)?.pages?.overview?.columns?.[column]
+
 // Forms New entry on Bookings may use without their Submissions page (the roles' bookings "entry_forms").
 export const entryForms = (tenantCode) => clinicOf(tenantCode)?.pages?.bookings?.entry_forms || []
 

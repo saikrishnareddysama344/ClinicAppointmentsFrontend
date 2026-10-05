@@ -25,15 +25,15 @@
             <div class="mono muted">{{ data.slug }}</div>
           </template>
         </Column>
-        <Column field="field_count" header="Fields" style="width: 80px" />
-        <Column v-if="kind === 'form'" header="Status" style="width: 200px">
+        <Column v-if="sees('field_count')" field="field_count" header="Fields" style="width: 80px" />
+        <Column v-if="kind === 'form' && sees('status')" header="Status" style="width: 200px">
           <template #body="{ data }">
             <FormStatusTag :status="data.status" />
             <div v-if="data.status !== FORM_STATUS.DRAFT && data.accepting_submissions !== FLAG_YES"
                  class="muted closed-note">Not accepting responses</div>
           </template>
         </Column>
-        <Column header="Updated" style="width: 180px">
+        <Column v-if="sees('updated')" header="Updated" style="width: 180px">
           <template #body="{ data }"><span class="muted">{{ formatEpoch(data.updated_at) }}</span></template>
         </Column>
         <Column style="width: 130px">
@@ -88,7 +88,7 @@ import { useNotify } from '@/composables/useNotify'
 import { FLAG_YES, FORM_STATUS } from '@/constants/formStatus'
 import { KIND_ROUTES } from '@/router'
 import { definitionApis, KINDS } from '@/services/api'
-import { can } from '@/services/auth'
+import { can, seesOverview } from '@/services/auth'
 import { formatEpoch, tenantCodeFromName } from '@/utils/format'
 
 // Forms and lists: the same page, for either kind.
@@ -98,6 +98,8 @@ const props = defineProps({
 })
 // The builder page ("forms" / "lists") and each one's own rows page ("form:12" / "list:7").
 const canDo = (action) => can(props.tenantCode, `${props.kind}s`, action)
+// Info columns this role sees (Roles > Lists / Forms pages)
+const sees = (column) => seesOverview(props.tenantCode, column)
 const isBuilder = computed(() => canDo('view'))
 const canRows = (item) => can(props.tenantCode, `${props.kind}:${item.id}`)
 

@@ -77,6 +77,18 @@
             </div>
           </PageAccessEditor>
         </div>
+        <div v-if="editor.pages.overview" class="group">
+          <div class="group-title">Lists / Forms pages</div>
+          <div class="checks">
+            <div v-for="c in overviewColumns" :key="c.key" class="check">
+              <Checkbox :modelValue="editor.pages.overview.columns[c.key] !== 'hidden'" binary :inputId="`ov-${c.key}`"
+                        @update:modelValue="editor.pages.overview.columns[c.key] = $event ? 'display' : 'hidden'" />
+              <label :for="`ov-${c.key}`">{{ c.label }}</label>
+            </div>
+          </div>
+          <small class="hint">Extra columns on the Lists and Forms pages (the name and the rows button are always there).
+            Builders and the Clinic admin always see them.</small>
+        </div>
         <small class="hint">Columns left hidden never reach this role's screens, downloads or printouts.
           New columns added later start hidden.</small>
       </div>
@@ -161,6 +173,8 @@ function specFor(page, saved) {
     entry_forms: (saved?.entry_forms || []).filter((id) => page.entry_forms?.some((f) => f.id === id)) }
 }
 
+const overviewColumns = computed(() => catalog.value.find((p) => p.key === 'overview')?.columns || [])
+
 function open(role, copy = false) {
   Object.assign(editor, {
     open: true, error: '', saving: false,
@@ -169,6 +183,10 @@ function open(role, copy = false) {
     description: role?.description || '',
     pages: Object.fromEntries(catalog.value.map((p) => [p.key, specFor(p, role?.pages?.[p.key])]))
   })
+  // A role saved before "Lists / Forms pages" existed sees every info column: show it that way.
+  if (role && !role.pages?.overview && editor.pages.overview) {
+    overviewColumns.value.forEach((c) => { editor.pages.overview.columns[c.key] = 'display' })
+  }
 }
 
 // Start from a template: its pages replace what is in the editor (name and description too, if still empty).
@@ -185,6 +203,10 @@ function payloadPages() {
   const pages = {}
   for (const [key, s] of Object.entries(editor.pages)) {
     const page = catalog.value.find((p) => p.key === key)
+    if (page.type === 'overview') {   // info columns only (always saved, so new roles start with them hidden)
+      pages[key] = { actions: [], columns: s.columns }
+      continue
+    }
     const done = (list) => list.filter((c) => c.column && c.op)
     const values = page.type === 'list' ? done(s.values) : []
     if (!s.on) {
