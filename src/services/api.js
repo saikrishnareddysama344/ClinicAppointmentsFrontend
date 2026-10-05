@@ -124,7 +124,8 @@ export const schedulesApi = (() => {
     create: (t, payload) => request('POST', base(t), payload),
     get: (t, slug) => request('GET', one(t, slug)),
     update: (t, slug, payload) => request('PUT', one(t, slug), payload),
-    windows: (t, slug) => request('GET', `${one(t, slug)}/windows`),
+    // past: also timings on dates that have passed
+    windows: (t, slug, past = false) => request('GET', `${one(t, slug)}/windows${past ? '?past=1' : ''}`),
     // Timings laid out on dates: {from: 'YYYY-MM-DD', days: 1..31}
     calendar: (t, slug, params) => request('GET', `${one(t, slug)}/calendar${qs(params)}`),
     saveWindow: (t, slug, payload, id) =>

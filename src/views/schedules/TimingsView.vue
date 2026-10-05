@@ -60,11 +60,20 @@
     </div>
 
     <div v-else-if="tab === 'Windows'" class="panel">
+      <div class="past-switch">
+        <ToggleSwitch v-model="showPast" inputId="w-past" @update:modelValue="load" />
+        <label for="w-past">Show past dates</label>
+      </div>
       <DataTable :value="windows" :loading="loading" dataKey="id" :rowClass="(w) => (w.status === 'active' ? '' : 'muted')">
         <template #empty>
           <div class="empty"><i class="pi pi-clock" aria-hidden="true" />No windows yet, for example Monday 09:00–12:00, 20 tokens.</div>
         </template>
-        <Column header="Day"><template #body="{ data }">{{ weekdays[data.weekday] }}</template></Column>
+        <Column header="Day">
+          <template #body="{ data }">
+            <template v-if="data.on_date">{{ dayLabel(data.on_date) }} <Tag value="one date" severity="info" /></template>
+            <template v-else>Every {{ weekdays[data.weekday] }}</template>
+          </template>
+        </Column>
         <Column field="who" :header="schedule?.who_list.name" />
         <Column v-if="schedule?.where_list" field="where" :header="schedule.where_list.name" />
         <Column header="Time"><template #body="{ data }">{{ data.start_time }}–{{ data.end_time }}</template></Column>
@@ -125,9 +134,21 @@
           <Select inputId="w-where" v-model="win.where_id" :options="options.where" optionLabel="label" optionValue="id" fluid
                   :ariaLabel="schedule.where_list.name" />
         </div>
-        <div class="field">
+        <div v-if="!win.id" class="field">
+          <label>Repeats</label>
+          <SelectButton v-model="win.mode" :options="[{ v: 'weekly', l: 'Every week' }, { v: 'dates', l: 'On dates' }]"
+                        optionLabel="l" optionValue="v" :allowEmpty="false" aria-label="Repeats" />
+        </div>
+        <div v-if="win.mode === 'weekly'" class="field">
           <label for="w-day">Day</label>
           <Select inputId="w-day" v-model="win.weekday" :options="weekdayOptions" optionLabel="label" optionValue="value" fluid />
+        </div>
+        <div v-else class="field">
+          <label for="w-dates">{{ win.id ? 'Date' : 'Dates (choose one or more)' }}</label>
+          <DatePicker v-model="win.dates" inputId="w-dates" :selectionMode="win.id ? 'single' : 'multiple'" :minDate="today"
+                      dateFormat="dd/mm/yy" showIcon fluid ariaLabel="Dates" />
+          <small class="hint">The timing exists only on {{ win.id ? 'this date' : 'these dates' }} (for example an extra
+            session or a Sunday camp). Weekly timings stay as they are.</small>
         </div>
         <div class="row-inline">
           <div class="field grow"><label for="w-start">From</label><InputText id="w-start" v-model="win.start_time" type="time" fluid /></div>
@@ -223,7 +244,7 @@ async function load() {
     schedule.value = (await loadClinic(t)).booking
     if (!schedule.value) return
     const today = toApiValue('date', new Date())
-    const [w, l, who, where] = await Promise.all([schedulesApi.windows(t, slug()),
+    const [w, l, who, where] = await Promise.all([schedulesApi.windows(t, slug(), showPast.value),
       schedulesApi.leaves(t, slug(), { from: today }), listOptions(schedule.value.who_list),
       listOptions(schedule.value.where_list)])
     windows.value = w.windows
@@ -288,9 +309,14 @@ const limited = computed(() => ({
 const canRemoveLeave = (l) => (!limited.value.who || options.who.some((o) => o.id === l.who_id))
   && (!limited.value.where || options.where.some((o) => o.id === l.where_id))
 
+const today = new Date(new Date().setHours(0, 0, 0, 0))
+const showPast = ref(false)
+
 function editWindow(w) {
+  const dated = !!w?.on_date
   Object.assign(win, { open: true, error: '', id: w?.id || null, who_id: w?.who_id ?? only(options.who),
-    where_id: w?.where_id ?? only(options.where),
+    where_id: w?.where_id ?? only(options.where), mode: dated ? 'dates' : 'weekly',
+    dates: dated ? new Date(`${w.on_date}T00:00:00`) : [],
     weekday: w?.weekday ?? 0, start_time: w?.start_time || '09:00', end_time: w?.end_time || '12:00',
     max_tokens: w?.max_tokens ?? 20, fee: w?.fee != null ? Number(w.fee) : null })
 }
@@ -299,9 +325,13 @@ async function saveWindow() {
   Object.assign(win, { saving: true, error: '' })
   try {
     const { id, who_id, where_id, weekday, start_time, end_time, max_tokens, fee } = win
-    await schedulesApi.saveWindow(t, slug(), { who_id, where_id, weekday, start_time, end_time, max_tokens, fee }, id)
+    const payload = { who_id, where_id, start_time, end_time, max_tokens, fee }
+    if (win.mode === 'weekly') payload.weekday = weekday
+    else if (id) payload.on_date = toApiValue('date', win.dates)
+    else payload.dates = (win.dates || []).map((d) => toApiValue('date', d))
+    const result = await schedulesApi.saveWindow(t, slug(), payload, id)
     win.open = false
-    notify.success('Window saved')
+    notify.success(result.message || 'Window saved')
     load()
   } catch (e) {
     win.error = Object.values(e.data?.errors || {}).join(' ') || e.message
@@ -315,7 +345,8 @@ const leave = reactive({ open: false, error: '', saving: false })
 const leaveWindows = computed(() => windows.value
   .filter((w) => w.status === 'active' && (!leave.who_id || w.who_id === leave.who_id)
     && (!leave.where_id || w.where_id === leave.where_id)
-    && (!leave.day || w.weekday === (leave.day.getDay() + 6) % 7))
+    && (!leave.day || (w.weekday === (leave.day.getDay() + 6) % 7
+      && (!w.on_date || w.on_date === toApiValue('date', leave.day)))))
   .map((w) => ({ id: w.id, label: `${w.who}${w.where ? ` · ${w.where}` : ''} · ${w.start_time}–${w.end_time}` })))
 
 function openLeave() {
@@ -352,6 +383,13 @@ onMounted(load)
 </script>
 
 <style scoped>
+.past-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
 .mb {
   margin-bottom: 1rem;
 }
