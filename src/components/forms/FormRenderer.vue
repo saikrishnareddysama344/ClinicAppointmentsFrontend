@@ -207,7 +207,9 @@ async function verifyOtp(field) {
 const otpTokens = () => Object.fromEntries(props.fields.filter((f) => needsOtp(f) && otpOf(f).token).map((f) => [f.id, otpOf(f).token]))
 
 let initialPass = true   // true while the starting answers are being applied
-watch(() => [props.fields.map((f) => f.key), props.initialValues], () => reset(), { immediate: true })
+// Keys compared by value: the parent may rebuild the same fields (e.g. slot details arriving later), which
+// must not wipe what was already typed.
+watch(() => [props.fields.map((f) => f.key).join('\u0000'), props.initialValues], () => reset(), { immediate: true })
 
 // ---------- dropdowns fed by lists (optionally depending on an earlier dropdown) ----------
 const listOptions = reactive({})
