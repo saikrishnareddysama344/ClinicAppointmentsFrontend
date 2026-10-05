@@ -80,16 +80,26 @@ async function loadWhos() {
 function onWhere() {
   pick.who_id = null
   windows.value = []
+  shownKey = null
   clear()
   loadWhos()
 }
 
-async function loadWindows() {
+// The times of the chosen doctor, branch and day. A repeated change to the same day (the date box reports
+// typing, Escape, closing) keeps the chosen time; an answer from an older load never overwrites a newer one.
+let shownKey = null
+let loadNo = 0
+async function loadWindows(force = false) {
+  const params = { date: toApiValue('date', pick.day), who_id: pick.who_id, where_id: pick.where_id }
+  const key = JSON.stringify(params)
+  if (key === shownKey && force !== true) return
+  shownKey = key
   clear()
   windows.value = []
   if (!pick.day || !pick.who_id) return
-  const params = { date: toApiValue('date', pick.day), who_id: pick.who_id, where_id: pick.where_id }
-  windows.value = (await run('windows', () => props.api.availability(params))).windows || []
+  const mine = ++loadNo
+  const found = (await run('windows', () => props.api.availability(params))).windows || []
+  if (mine === loadNo) windows.value = found
 }
 
 function choose(w) {
@@ -111,7 +121,7 @@ watch(() => props.api, async (api) => {
   } else await loadWhos()
 }, { immediate: true })
 
-watch(() => props.refreshKey, loadWindows)
+watch(() => props.refreshKey, () => loadWindows(true))   // e.g. after a booking: places left changed
 </script>
 
 <style scoped>
