@@ -52,6 +52,8 @@ export function useBuilder(tenantCode, slug, kind = 'form') {
       schedule_id: options.schedule_id ?? null,
       contact_field_id: options.contact_field_id ?? null,
       name_field_id: options.name_field_id ?? null,
+      // phone: patients confirm the number with a code before the form is accepted (S4)
+      verify_otp: !!options.verify_otp,
       // hidden on the public form / in the table, or retired (see FieldSettings)
       visibility: { ...VISIBILITY_OFF, ...(apiField.visibility || {}) }
     }
@@ -62,6 +64,7 @@ export function useBuilder(tenantCode, slug, kind = 'form') {
       return { schedule_id: field.schedule_id, contact_field_id: field.contact_field_id || null,
         name_field_id: field.name_field_id || null }
     }
+    if (field.data_type === 'phone') return kind === 'form' && field.verify_otp ? { verify_otp: true } : null
     if (field.data_type !== DROPDOWN_TYPE) return null
     if (field.source === LIST_SOURCE) {
       const config = { source: LIST_SOURCE, list_id: field.list_id }

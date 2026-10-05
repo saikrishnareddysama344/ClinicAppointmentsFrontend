@@ -65,6 +65,7 @@ export function rendererField(f) {
     source: f.source || o.source || 'static', options: f.options || o.options || [],
     list_id: o.list_id ?? null, list_slug: f.list_slug ?? null, match_field_id: o.match_field_id ?? null,
     depends_on_field_id: f.depends_on_field_id ?? o.depends_on_field_id ?? null,
-    slot: f.slot || null
+    slot: f.slot || null,
+    verify_otp: !!(f.verify_otp ?? o.verify_otp)   // public form: confirm the number with a code (S4)
   }
 }

@@ -67,6 +67,7 @@
             :optionsLoader="loadOptions"
             :slotApi="slotApi"
             :refreshKey="refreshKey"
+            :otpApi="otpApi"
             submitLabel="Submit"
             @submitted="submit"
           />
@@ -137,6 +138,12 @@ async function load() {
   }
 }
 
+// Verify by OTP: a code to the number, then a token for the submission
+const otpApi = {
+  send: (phone, channel) => publicApi.otpSend(props.tenantCode, props.formSlug, phone, channel),
+  verify: async (phone, code) => publicApi.otpVerify(props.tenantCode, props.formSlug, phone, code)
+}
+
 async function submit(answers) {
   clearServerErrors()
   const values = {}
@@ -148,6 +155,7 @@ async function submit(answers) {
   try {
     const result = await publicApi.submit(props.tenantCode, props.formSlug, {
       values,
+      otp_tokens: renderer.value?.otpTokens?.() || {},
       source,
       [form.value.honeypot_field]: honeypot.value
     })

@@ -71,6 +71,15 @@
         </div>
       </div>
 
+      <div v-if="kind === 'form' && field.data_type === 'phone'" class="vis-row">
+        <ToggleSwitch inputId="f-verify-otp" v-model="field.verify_otp" />
+        <div>
+          <label for="f-verify-otp">Verify by OTP</label>
+          <small class="hint">Patients get a 6-digit code by WhatsApp or SMS and the form is accepted only after they
+            enter it. Needs WhatsApp / SMS set up (Clinic settings > Messages).</small>
+        </div>
+      </div>
+
       <template v-if="field.data_type === DROPDOWN_TYPE">
         <div class="field">
           <label for="f-source">Options come from</label>

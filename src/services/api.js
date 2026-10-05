@@ -148,7 +148,10 @@ export const publicApi = (() => {
     availability: (t, slug, fieldId, params) =>
       request('GET', `${base(t, slug)}/fields/${fieldId}/availability${qs(params)}`),
     // A patient's own receipt, with the code returned when they booked
-    receipt: (t, slug, code) => request('GET', `${base(t, slug)}/receipts/${enc(code)}`)
+    receipt: (t, slug, code) => request('GET', `${base(t, slug)}/receipts/${enc(code)}`),
+    // Verify by OTP: a code to the number (channel: 'sms' to ask for SMS), then {token} for the submission
+    otpSend: (t, slug, phone, channel) => request('POST', `${base(t, slug)}/otp/send`, { phone, ...(channel ? { channel } : {}) }),
+    otpVerify: (t, slug, phone, code) => request('POST', `${base(t, slug)}/otp/verify`, { phone, code })
   }
 })()
 

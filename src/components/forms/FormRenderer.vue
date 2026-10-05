@@ -13,8 +13,27 @@
         :maxlength="maxLengthFor(field)"
         :placeholder="field.placeholder || ''"
         :invalid="!!fieldError(field)"
+        :disabled="!!otpOf(field).token"
         fluid
       />
+
+      <div v-if="needsOtp(field)" class="otp">
+        <template v-if="otpOf(field).token">
+          <span class="verified"><i class="pi pi-check-circle" aria-hidden="true" /> Verified</span>
+          <Button label="Change number" text size="small" @click="resetOtp(field)" />
+        </template>
+        <template v-else>
+          <Button v-if="!otpOf(field).sent" label="Send code" icon="pi pi-send" size="small" severity="secondary"
+                  :loading="otpOf(field).busy" @click="sendOtp(field)" />
+          <template v-else>
+            <InputText v-model="otpOf(field).code" inputmode="numeric" maxlength="6" placeholder="6-digit code"
+                       :aria-label="`Code for ${field.display_label}`" class="code" />
+            <Button label="Verify" size="small" :loading="otpOf(field).busy" @click="verifyOtp(field)" />
+            <Button label="Send by SMS instead" text size="small" @click="sendOtp(field, 'sms')" />
+          </template>
+          <small v-if="otpOf(field).message" class="hint">{{ otpOf(field).message }}</small>
+        </template>
+      </div>
 
       <Textarea
         v-else-if="kind(field) === 'textarea'"
@@ -139,13 +158,53 @@ const props = defineProps({
   // Bump to reload appointment times (e.g. after "this window is full")
   refreshKey: { type: Number, default: 0 },
   // Desk entry: a list dropdown with a single choice (e.g. a role limited to one branch) is chosen already
-  autoFill: { type: Boolean, default: false }
+  autoFill: { type: Boolean, default: false },
+  // Public form: { send(phone, channel), verify(phone, code) -> token } for phone fields with "Verify by OTP"
+  otpApi: { type: Object, default: null }
 })
 
 const emit = defineEmits(['submitted'])
 
 const values = reactive({})
 const errors = reactive({})
+
+// ---------- OTP (public form): a phone field marked "Verify by OTP" needs a code before submitting ----------
+const otp = reactive({})   // field.key -> { sent, code, token, busy, message }
+const needsOtp = (field) => !!props.otpApi && !!field.verify_otp
+const otpOf = (field) => (otp[field.key] ||= { sent: false, code: '', token: null, busy: false, message: '' })
+function resetOtp(field) {
+  Object.assign(otpOf(field), { sent: false, code: '', token: null, message: '' })
+}
+async function sendOtp(field, channel) {
+  const o = otpOf(field)
+  if (isEmpty(values[field.key])) {
+    errors[field.key] = 'Enter the mobile number first.'
+    return
+  }
+  Object.assign(o, { busy: true, message: '' })
+  try {
+    o.message = (await props.otpApi.send(values[field.key], channel)).message
+    o.sent = true
+  } catch (e) {
+    o.message = e.message
+  } finally {
+    o.busy = false
+  }
+}
+async function verifyOtp(field) {
+  const o = otpOf(field)
+  Object.assign(o, { busy: true, message: '' })
+  try {
+    o.token = (await props.otpApi.verify(values[field.key], o.code)).token
+    delete errors[field.key]
+  } catch (e) {
+    o.message = e.message
+  } finally {
+    o.busy = false
+  }
+}
+// Tokens of the verified numbers, keyed by field id (sent with the submission)
+const otpTokens = () => Object.fromEntries(props.fields.filter((f) => needsOtp(f) && otpOf(f).token).map((f) => [f.id, otpOf(f).token]))
 
 let initialPass = true   // true while the starting answers are being applied
 watch(() => [props.fields.map((f) => f.key), props.initialValues], () => reset(), { immediate: true })
@@ -237,7 +296,7 @@ function reset() {
   nextTick(() => { initialPass = false })   // after the option reloads this causes
 }
 
-defineExpose({ reset })
+defineExpose({ reset, otpTokens })
 
 function inputId(field) {
   return `preview-${field.key}`
@@ -273,6 +332,27 @@ function validate() {
 }
 
 function submit() {
-  if (validate()) emit('submitted', { ...values })
+  const unverified = props.fields.filter((f) => needsOtp(f) && !otpOf(f).token)
+  unverified.forEach((f) => { errors[f.key] = 'Verify this number with the code we send.' })
+  if (validate() && !unverified.length) emit('submitted', { ...values })
 }
 </script>
+
+<style scoped>
+.otp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.otp .code {
+  width: 8rem;
+}
+
+.verified {
+  color: var(--p-green-600, #16a34a);
+  font-weight: 600;
+}
+</style>
