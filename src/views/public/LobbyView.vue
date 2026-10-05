@@ -34,6 +34,7 @@ const data = ref(null)
 const error = ref('')
 const branch = ref(route.query.branch || null)
 let timer = null
+let stopped = false   // the page closed: no more polling
 
 async function load() {
   try {
@@ -44,7 +45,7 @@ async function load() {
     error.value = e.message
   } finally {
     clearTimeout(timer)
-    timer = setTimeout(load, (data.value?.refresh_seconds || 15) * 1000)
+    if (!stopped && !(error.value && !data.value)) timer = setTimeout(load, (data.value?.refresh_seconds || 15) * 1000)
   }
 }
 
@@ -54,7 +55,7 @@ function pick() {
 }
 
 onMounted(load)
-onBeforeUnmount(() => clearTimeout(timer))
+onBeforeUnmount(() => { stopped = true; clearTimeout(timer) })
 </script>
 
 <style scoped>

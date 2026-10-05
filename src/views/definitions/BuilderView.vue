@@ -21,9 +21,7 @@
                            :status="b.dirty.value && !b.isDraft.value ? FORM_STATUS.CHANGES_PENDING : b.form.value.status" />
           </div>
           <p class="sub">
-            <template v-if="b.form.value.table_name">
-              Data table <span class="mono">{{ b.form.value.schema_name }}.{{ b.form.value.table_name }}</span>
-            </template>
+            <template v-if="b.form.value.status !== 'draft'">Its data table is ready.</template>
             <template v-else>The data table is created when you {{ kind === 'form' ? 'publish' : 'save' }}.</template>
             <span v-if="b.dirty.value"> · Unsaved changes</span>
           </p>
@@ -200,15 +198,15 @@ async function confirmPublish() {
   confirm.require({
     header: b.isDraft.value ? 'Publish this form?' : 'Publish changes?',
     message: b.isDraft.value
-      ? `This creates the data table in ${form.tenant?.schema_name}. After publishing, field types and max lengths are locked and fields cannot be removed.`
-      : `${form.pending_count} new field(s) will be added as columns to ${form.table_name}.`,
+      ? 'This creates the data table. After publishing, field types and max lengths are locked and fields cannot be removed.'
+      : `${form.pending_count} new field(s) will be added as columns.`,
     icon: 'pi pi-upload',
     rejectProps: { label: 'Cancel', severity: 'secondary', text: true },
     acceptProps: { label: 'Publish' },
     accept: async () => {
       try {
         const result = await b.publish()
-        notify.success('Published', `${result.message} Table: ${result.schema_name}.${result.table_name}`)
+        notify.success('Published', result.message)
       } catch (e) {
         notify.error('Publish failed', e)
       }

@@ -27,9 +27,6 @@
         <Column field="code" header="Code">
           <template #body="{ data }"><span class="mono">{{ data.code }}</span></template>
         </Column>
-        <Column field="schema_name" header="Schema">
-          <template #body="{ data }"><span class="mono">{{ data.schema_name }}</span></template>
-        </Column>
         <Column field="form_count" header="Forms" style="width: 90px" />
         <Column header="Created" style="width: 190px">
           <template #body="{ data }"><span class="muted">{{ formatEpoch(data.created_at) }}</span></template>
@@ -129,7 +126,7 @@ async function createTenant() {
   try {
     const { tenant } = await tenantsApi.create({ name: draft.name, code: draft.code, admin: { ...draft.admin } })
     showCreate.value = false
-    notify.success('Tenant created', `Schema ${tenant.schema_name} is ready.`)
+    notify.success('Tenant created', tenant.name)
     router.push({ name: ROUTES.FORMS, params: { tenantCode: tenant.code } })
   } catch (e) {
     if (e.data?.errors) Object.assign(errors, e.data.errors)

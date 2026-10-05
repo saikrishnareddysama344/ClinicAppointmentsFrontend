@@ -44,6 +44,7 @@ const q = ref(null)
 const error = ref('')
 const updated = ref('')
 let timer = null
+let stopped = false   // the page closed: no more polling
 
 async function load() {
   try {
@@ -55,12 +56,12 @@ async function load() {
     error.value = e.httpStatus === 404 ? 'Booking not found. Check the link on your receipt.' : e.message
   } finally {
     clearTimeout(timer)
-    timer = setTimeout(load, (q.value?.refresh_seconds || 15) * 1000)
+    if (!stopped && !(error.value && !q.value)) timer = setTimeout(load, (q.value?.refresh_seconds || 15) * 1000)
   }
 }
 
 onMounted(load)
-onBeforeUnmount(() => clearTimeout(timer))
+onBeforeUnmount(() => { stopped = true; clearTimeout(timer) })
 </script>
 
 <style scoped>
