@@ -30,32 +30,40 @@ function header(clinic, compact) {
   </div>`
 }
 
-// One receipt (with the bill when there is one).
+// The patient's live queue page (printed on the receipt)
+const queueLink = (data) => (data.clinic?.code && data.booking.receipt_code
+  ? `${window.location.origin}/q/${data.clinic.code}/${data.booking.receipt_code}` : '')
+
+// Paid, or what happened to a paid booking that was cancelled
+function paidLine(b) {
+  if (b.status === 'cancelled' && b.paid) {
+    if (!b.refund) return 'Paid – cancelled'
+    return b.refund.refunded ? `Refunded ₹${money(b.refund.amount)} (${String(b.refund.mode).toUpperCase()})` : 'Not refunded'
+  }
+  return b.bill ? `₹${money(b.bill.total)} (${String(b.bill.mode).toUpperCase()})` : ''
+}
+
+// One receipt, short: the token large, when and with whom, the patient, what was paid, the OP number and the
+// live queue link. (Every answer of the form and who booked stay on the OP sheet and in the system.)
 export function receiptHtml(data) {
   const b = data.booking
-  const bill = b.bill
+  const link = queueLink(data)
   return `<section class="sheet receipt">
     ${header(data.clinic, true)}
-    <div class="title">APPOINTMENT RECEIPT</div>
     ${b.status === 'cancelled' ? '<div class="cancelled">CANCELLED</div>' : ''}
-    <div class="token">Token <b>${esc(b.token_no)}</b></div>
+    <div class="token">Token <b>${esc(b.token_no)}</b>${b.previous_tokens?.length ? `<small>(was ${esc(b.previous_tokens.join(', '))})</small>` : ''}</div>
     <table class="kv">
       <tr><td>${esc(data.who_label || 'Doctor')}</td><td>${esc(b.who)}</td></tr>
       ${b.where ? `<tr><td>${esc(data.where_label || 'Branch')}</td><td>${esc(b.where)}</td></tr>` : ''}
-      <tr><td>Date</td><td>${esc(day(b.date))}</td></tr>
-      <tr><td>Time</td><td>${esc(b.start)}–${esc(b.end)}</td></tr>
+      <tr><td>When</td><td>${esc(day(b.date))}, ${esc(b.start)}–${esc(b.end)}</td></tr>
+      ${b.patient_name ? `<tr><td>Patient</td><td>${esc(b.patient_name)}</td></tr>` : ''}
+      ${b.contact ? `<tr><td>Phone</td><td>${esc(b.contact)}</td></tr>` : ''}
       <tr><td>Visit</td><td>${esc(visitText(b))}</td></tr>
-      ${data.patient.filter((a) => !a.staff_only).map((a) => `<tr><td>${esc(a.label)}</td><td>${esc(value(a))}</td></tr>`).join('')}
+      ${paidLine(b) ? `<tr class="paid"><td>${b.status === 'cancelled' ? 'Payment' : 'Paid'}</td><td>${esc(paidLine(b))}</td></tr>` : ''}
       ${b.op_number ? `<tr><td>OP number</td><td>${esc(b.op_number)}</td></tr>` : ''}
-      <tr><td>Booking no.</td><td>${esc(b.id)}</td></tr>
-      <tr><td>Booked</td><td>${esc(stamp(b.created_at))} (${esc(data.booked_by)})</td></tr>
     </table>
-    ${bill ? `<table class="bill">
-      ${bill.lines.map((l) => `<tr><td>${esc(l.label)}</td><td class="num">${esc(money(l.amount))}</td></tr>`).join('')}
-      <tr class="total"><td>Total (${esc(String(bill.mode).toUpperCase())})</td><td class="num">${esc(money(bill.total))}</td></tr>
-    </table>` : ''}
+    ${link && b.status !== 'cancelled' ? `<div class="queue">Live queue: <span>${esc(link)}</span></div>` : ''}
     ${data.clinic.note ? `<div class="note">${esc(data.clinic.note)}</div>` : ''}
-    ${data.settings?.language_line ? `<div class="note">${esc(data.settings.language_line)}</div>` : ''}
   </section>`
 }
 
@@ -65,7 +73,8 @@ export function opSheetHtml(data) {
   const template = data.op_template || { fields: [], sections: [] }
   const byId = Object.fromEntries(data.patient.map((a) => [a.field_id, a]))
   const fields = template.fields?.length ? template.fields.map((id) => byId[id]).filter(Boolean) : data.patient
-  const lines = (n) => Array.from({ length: n }, () => '<div class="line"></div>').join('')
+  // Space to write in, without ruled lines (the template's line count sets the height)
+  const space = (n) => (n ? `<div class="space" style="height: ${n * 22}px"></div>` : '')
   return `<section class="sheet op">
     ${header(data.clinic, false)}
     <div class="op-head">
@@ -85,7 +94,7 @@ export function opSheetHtml(data) {
     ${(template.sections || []).map((s) => `<div class="section">
       <div class="section-title">${esc(s.title)}</div>
       ${s.items?.length ? `<div class="items">${s.items.map((i) => `<span>${esc(i)}: ________</span>`).join('')}</div>` : ''}
-      ${lines(s.lines || 0)}
+      ${space(s.lines || 0)}
     </div>`).join('')}
     <div class="sign">Doctor's signature</div>
   </section>`
@@ -115,7 +124,10 @@ const STYLE = (page) => `
   .title { text-align: center; font-weight: bold; margin: 4px 0; letter-spacing: 1px; }
   .cancelled { text-align: center; font-weight: bold; font-size: 1.3em; border: 2px solid #000; margin: 4px 0; }
   .token { text-align: center; font-size: 1.3em; margin: 6px 0; }
-  .token b { font-size: 2.4em; display: block; line-height: 1.1; }
+  .token b { font-size: 2.6em; display: block; line-height: 1.1; }
+  .token small { display: block; font-size: 0.7em; }
+  .kv .paid td { font-weight: bold; }
+  .queue { margin-top: 6px; font-size: 0.85em; text-align: center; word-break: break-all; }
   table { width: 100%; border-collapse: collapse; }
   .kv td, .patient td { padding: 2px 0; vertical-align: top; }
   .kv td:first-child, .patient td:first-child { color: #333; width: 40%; }
@@ -131,7 +143,7 @@ const STYLE = (page) => `
   .section { margin-top: 8px; }
   .section-title { font-weight: bold; border-bottom: 1px solid #000; }
   .items { display: flex; flex-wrap: wrap; gap: 14px; margin: 6px 0; }
-  .line { border-bottom: 1px dotted #777; height: 22px; }
+  .space { }
   .sign { margin-top: 30px; text-align: right; }
   .poster { text-align: center; padding-top: 20mm; }
   .poster-clinic { font-size: 32px; font-weight: bold; }

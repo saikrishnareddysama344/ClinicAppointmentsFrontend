@@ -128,7 +128,7 @@
           <label for="p-auto">Open the print dialog right after staff add a booking</label>
         </div>
         <div class="field">
-          <label for="p-lang">Extra line on receipts and QR posters (any language)</label>
+          <label for="p-lang">Extra line on QR posters (any language)</label>
           <InputText id="p-lang" v-model="form.print.language_line" maxlength="150" fluid />
         </div>
       </template>
