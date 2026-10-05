@@ -2,6 +2,7 @@
 // printers installed in Windows and with "Save as PDF"). The page is built as plain HTML in a hidden
 // iframe (id "print-frame") so the app's own page is untouched; the frame stays until the next print.
 import { appConfig } from '@/config/env'
+import { logoUrl } from '@/utils/logo'
 import { visitLabel } from '@/utils/visit'
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
@@ -23,8 +24,9 @@ const value = (a) => (a.value === true ? 'Yes' : a.value === false ? 'No' : a.va
 const visitText = (b) => visitLabel(b) + (b.visit_type === 'revisit' && b.valid_until ? ` (valid till ${day(b.valid_until)})` : '')
 
 function header(clinic, compact) {
+  const logo = logoUrl(clinic.logo)
   return `<div class="clinic ${compact ? 'compact' : ''}">
-    <div class="clinic-name">${esc(clinic.name)}</div>
+    <div class="clinic-top">${logo ? `<img class="logo" src="${esc(logo)}" alt="">` : ''}<div class="clinic-name">${esc(clinic.name)}</div></div>
     ${clinic.address ? `<div>${esc(clinic.address)}</div>` : ''}
     ${clinic.phone ? `<div>Phone: ${esc(clinic.phone)}</div>` : ''}
   </div>`
@@ -121,6 +123,9 @@ const STYLE = (page) => `
   .sheet:last-child { page-break-after: auto; }
   .clinic { text-align: center; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 6px; }
   .clinic-name { font-size: 1.4em; font-weight: bold; }
+  .clinic-top { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .clinic .logo { height: 56px; max-width: 160px; object-fit: contain; }
+  .clinic.compact .logo { height: 36px; max-width: 110px; }
   .title { text-align: center; font-weight: bold; margin: 4px 0; letter-spacing: 1px; }
   .cancelled { text-align: center; font-weight: bold; font-size: 1.3em; border: 2px solid #000; margin: 4px 0; }
   .token { text-align: center; font-size: 1.3em; margin: 6px 0; }
@@ -168,12 +173,16 @@ export function printSheets(parts, paper = 'A4', title = 'Print', frameId = 'pri
   doc.open()
   doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>${STYLE(page)}</style></head><body>${body}</body></html>`)
   doc.close()
-  setTimeout(() => {
+  // Print once the pictures (the clinic logo) have loaded or failed, at most 3 seconds later.
+  const pictures = [...doc.images].filter((img) => !img.complete)
+    .map((img) => new Promise((done) => { img.onload = img.onerror = done }))
+  const ready = Promise.race([Promise.all(pictures), new Promise((done) => setTimeout(done, 3000))])
+  ready.then(() => setTimeout(() => {
     try {
       frame.contentWindow.focus()
       frame.contentWindow.print()
     } catch { /* printing blocked: the frame still holds the page */ }
-  }, 50)
+  }, 50))
 }
 
 // Receipt and/or OP sheet from the print API's answer, each on its clinic's paper size.

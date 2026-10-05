@@ -22,7 +22,9 @@
           </div>
         </template>
         <Column field="name" header="Name">
-          <template #body="{ data }"><strong>{{ data.name }}</strong></template>
+          <template #body="{ data }">
+            <span class="name-cell"><ClinicLogo :path="data.logo" :size="28" /><strong>{{ data.name }}</strong></span>
+          </template>
         </Column>
         <Column field="code" header="Code">
           <template #body="{ data }"><span class="mono">{{ data.code }}</span></template>
@@ -79,6 +81,7 @@
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import ClinicLogo from '@/components/common/ClinicLogo.vue'
 import { useNotify } from '@/composables/useNotify'
 import { ROUTES } from '@/router'
 import { clinicHome } from '@/router'
@@ -144,6 +147,11 @@ onMounted(load)
 </script>
 
 <style scoped>
+.name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
 .head-actions {
   display: flex;
   gap: 0.5rem;

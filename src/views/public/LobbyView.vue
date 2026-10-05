@@ -1,7 +1,7 @@
 <template>
   <main class="lobby">
     <header>
-      <span class="clinic">{{ data?.clinic }}</span>
+      <span class="clinic"><ClinicLogo :path="data?.logo" :size="48" />{{ data?.clinic }}</span>
       <Select v-if="data?.branches?.length > 1" v-model="branch" :options="[{ id: null, label: 'All branches' }, ...data.branches]"
               optionLabel="label" optionValue="id" ariaLabel="Branch" class="branch" @change="pick" />
       <span class="time">{{ data?.time }}</span>
@@ -24,6 +24,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import ClinicLogo from '@/components/common/ClinicLogo.vue'
 import { queueApi } from '@/services/api'
 
 // The clinic's lobby screen: /tv/<clinic code>/<screen key>?branch=<branch id>. Tokens only, no names.
@@ -76,6 +77,9 @@ header {
 
 .clinic {
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .branch {

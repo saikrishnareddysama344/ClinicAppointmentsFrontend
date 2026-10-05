@@ -47,7 +47,10 @@ export const clinicApi = {
   saveSetup: (t, payload) => request('PUT', `/v1/tenants/${enc(t)}/setup`, payload),
   // The lobby screen's secret link key (admins); renew makes a new one
   screenKey: (t) => request('GET', `/v1/tenants/${enc(t)}/screen`),
-  renewScreenKey: (t) => request('POST', `/v1/tenants/${enc(t)}/screen`)
+  renewScreenKey: (t) => request('POST', `/v1/tenants/${enc(t)}/screen`),
+  // The clinic's logo (admins): image = "data:image/png;base64,..."
+  saveLogo: (t, image) => request('PUT', `/v1/tenants/${enc(t)}/logo`, { image }),
+  removeLogo: (t) => request('DELETE', `/v1/tenants/${enc(t)}/logo`)
 }
 
 // Live queue pages (no login): a patient's own token, and the lobby screen

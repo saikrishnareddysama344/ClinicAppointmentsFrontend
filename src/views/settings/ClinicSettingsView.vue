@@ -23,6 +23,20 @@
           <div>{{ form.clinic.name }} <small class="muted">(changed by the app admin)</small></div>
         </div>
         <div class="field">
+          <label for="c-logo">Logo</label>
+          <div class="logo-row">
+            <ClinicLogo v-if="form.clinic.logo" :path="form.clinic.logo" :size="64" />
+            <span v-else class="muted">No logo</span>
+            <input id="c-logo" ref="logoInput" type="file" accept="image/*" class="hidden-file" @change="uploadLogo" />
+            <Button type="button" :label="form.clinic.logo ? 'Change logo' : 'Upload logo'" icon="pi pi-upload" severity="secondary"
+                    outlined :loading="logoBusy" @click="logoInput.click()" />
+            <Button v-if="form.clinic.logo" type="button" label="Remove" icon="pi pi-trash" severity="danger" text
+                    :disabled="logoBusy" @click="removeLogo" />
+          </div>
+          <small class="hint">Shown next to the clinic name in the app, on receipts and OP sheets and on the patient pages.
+            Any picture; it is shrunk to {{ LOGO_MAX_SIDE }} px. Saved at once.</small>
+        </div>
+        <div class="field">
           <label for="c-address">Address</label>
           <Textarea id="c-address" v-model="form.clinic.address" rows="2" maxlength="300" fluid />
         </div>
@@ -201,12 +215,16 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import ClinicLogo from '@/components/common/ClinicLogo.vue'
 import TenantNav from '@/components/layout/TenantNav.vue'
 import MessagingSettings from '@/components/messaging/MessagingSettings.vue'
 import { forgetClinic } from '@/composables/useClinic'
+import { forgetTenant } from '@/composables/useTenant'
 import { useNotify } from '@/composables/useNotify'
 import { clinicApi, listsApi, rolesApi } from '@/services/api'
 import { opSheetHtml, printSheets } from '@/utils/print'
+import { LOGO_MAX_SIDE, shrinkLogo } from '@/utils/logo'
+import { refreshUser } from '@/services/auth'
 
 const props = defineProps({ tenantCode: { type: String, required: true } })
 const t = props.tenantCode
@@ -236,6 +254,31 @@ async function renewScreen() {
     notify.error('Could not make a new link', e)
   }
 }
+// Logo: shrunk in the browser, saved at once; the header, clinic list and printouts pick it up.
+const logoInput = ref(null)
+const logoBusy = ref(false)
+async function logoChanged(work, done) {
+  logoBusy.value = true
+  try {
+    const body = await work()
+    form.clinic.logo = body.logo
+    forgetClinic(t)
+    forgetTenant(t)
+    await refreshUser()
+    notify.success(done)
+  } catch (e) {
+    notify.error('Could not change the logo', e)
+  } finally {
+    logoBusy.value = false
+  }
+}
+async function uploadLogo(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (file) await logoChanged(async () => clinicApi.saveLogo(t, await shrinkLogo(file)), 'Logo saved')
+}
+const removeLogo = () => logoChanged(() => clinicApi.removeLogo(t), 'Logo removed')
+
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
@@ -333,7 +376,7 @@ async function save() {
 function preview() {
   const labels = answerFields.value.filter((f) => !form.template.fields.length || form.template.fields.includes(f.id))
   printSheets([[opSheetHtml({
-    clinic: { name: form.clinic.name, address: form.clinic.address, phone: form.clinic.phone },
+    clinic: { name: form.clinic.name, logo: form.clinic.logo, address: form.clinic.address, phone: form.clinic.phone },
     booking: { op_number: 'OP/0000/000001', token_no: 7, date: new Date().toISOString().slice(0, 10), start: '10:00', end: '12:00',
       who: 'Doctor name', where: form.booking.where_list ? 'Branch name' : null },
     patient: labels.map((f) => ({ field_id: f.id, label: f.label.replace(/ \(.*\)$/, ''), value: '' })),
@@ -345,6 +388,15 @@ onMounted(load)
 </script>
 
 <style scoped>
+.logo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.hidden-file {
+  display: none;
+}
 .settings {
   max-width: 760px;
 }

@@ -14,7 +14,7 @@
 
       <template v-else>
         <header class="public-head">
-          <p class="tenant-name">{{ form.tenant_name }}</p>
+          <p class="tenant-name"><ClinicLogo :path="form.tenant_logo" :size="36" />{{ form.tenant_name }}</p>
           <h1>{{ form.title }}</h1>
         </header>
 
@@ -82,6 +82,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import ClinicLogo from '@/components/common/ClinicLogo.vue'
 import FormRenderer from '@/components/forms/FormRenderer.vue'
 import { publicApi } from '@/services/api'
 import { displayValue, rendererField, toApiValue } from '@/utils/format'
@@ -222,6 +223,9 @@ onMounted(load)
 }
 
 .tenant-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin: 0 0 0.25rem;
   color: var(--p-primary-color);
   font-weight: 600;

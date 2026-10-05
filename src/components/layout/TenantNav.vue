@@ -4,7 +4,9 @@
       <router-link :to="{ name: ROUTES.TENANTS }">Tenants</router-link>
       <i class="pi pi-angle-right" aria-hidden="true" />
     </template>
-    <router-link :to="{ name: section.route, params: { tenantCode } }">{{ tenant?.name || tenantCode }}</router-link>
+    <router-link :to="{ name: section.route, params: { tenantCode } }" class="clinic-crumb">
+      <ClinicLogo :path="tenant?.logo" :size="20" />{{ tenant?.name || tenantCode }}
+    </router-link>
     <template v-for="(crumb, i) in crumbs" :key="i">
       <i class="pi pi-angle-right" aria-hidden="true" />
       <router-link v-if="crumb.to" :to="crumb.to">{{ crumb.label }}</router-link>
@@ -22,8 +24,9 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import ClinicLogo from '@/components/common/ClinicLogo.vue'
 import { CLINIC_TABS, ROUTES } from '@/router'
-import { loadTenant } from '@/composables/useTenant'
+import { loadTenant, tenantsChanged } from '@/composables/useTenant'
 import { clinics, isPlatformAdmin } from '@/services/auth'
 
 const props = defineProps({
@@ -37,7 +40,7 @@ const tabs = computed(() => CLINIC_TABS.filter((t) => t.allowed(props.tenantCode
 const showTenants = computed(() => isPlatformAdmin.value || clinics.value.length > 1)
 
 const tenant = ref(null)
-watch(() => props.tenantCode, async (code) => {
+watch(() => [props.tenantCode, tenantsChanged.value], async ([code]) => {
   tenant.value = await loadTenant(code).catch(() => null)
 }, { immediate: true })
 
@@ -51,6 +54,11 @@ defineExpose({ tenant })
 </script>
 
 <style scoped>
+.clinic-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
 .tenant-tabs {
   display: flex;
   gap: 0.25rem;

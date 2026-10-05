@@ -3,7 +3,7 @@
     <div class="card">
       <div v-if="error" class="muted">{{ error }}</div>
       <template v-else-if="q">
-        <div class="clinic">{{ q.clinic }}</div>
+        <div class="clinic"><ClinicLogo :path="q.logo" :size="40" />{{ q.clinic }}</div>
         <div class="label">Your token</div>
         <div class="token">{{ q.token }}</div>
         <div v-if="q.previous_tokens.length" class="muted">was {{ q.previous_tokens.join(', ') }}</div>
@@ -35,6 +35,7 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import ClinicLogo from '@/components/common/ClinicLogo.vue'
 import { queueApi } from '@/services/api'
 import { displayValue } from '@/utils/format'
 
@@ -85,6 +86,10 @@ onBeforeUnmount(() => { stopped = true; clearTimeout(timer) })
 .clinic {
   font-weight: 700;
   color: var(--p-primary-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .label {
