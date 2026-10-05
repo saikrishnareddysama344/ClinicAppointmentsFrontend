@@ -51,6 +51,8 @@ export const rolesApi = (() => {
   const base = (t) => `/v1/tenants/${enc(t)}/roles`
   return {
     catalog: (t) => request('GET', `/v1/tenants/${enc(t)}/access-catalog`),
+    // Ready-made starting points for New role (e.g. Reception), filled in for this clinic
+    templates: (t) => request('GET', `/v1/tenants/${enc(t)}/role-templates`),
     list: (t) => request('GET', base(t)),
     create: (t, payload) => request('POST', base(t), payload),
     update: (t, id, payload) => request('PUT', `${base(t)}/${id}`, payload),
@@ -110,7 +112,8 @@ export const schedulesApi = (() => {
     // part: 'windows' | 'leaves'
     setStatus: (t, slug, part, id, active) => request('PUT', `${one(t, slug)}/${part}/${id}/status`, { active }),
     bookings: (t, slug, params) => request('GET', `${one(t, slug)}/bookings${qs(params)}`),
-    cancelBooking: (t, slug, id) => request('PUT', `${one(t, slug)}/bookings/${id}/cancel`),
+    // refund (a paid booking): { refunded: false } or { refunded: true, amount, mode }
+    cancelBooking: (t, slug, id, refund) => request('PUT', `${one(t, slug)}/bookings/${id}/cancel`, refund),
     // Today's queue: status = arrived | not_attended (to the end of the list) | done | waiting
     setVisit: (t, slug, id, status) => request('PUT', `${one(t, slug)}/bookings/${id}/visit`, { status }),
     // Mark the payment received: {mode} for the amount due, or {mode, lines} to change it

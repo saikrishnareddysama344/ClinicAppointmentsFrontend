@@ -44,7 +44,14 @@
       <DataTable :value="shown(w)" dataKey="id" size="small" :rowClass="rowClass">
         <template #empty><span class="muted">No bookings yet.</span></template>
         <Column header="#" style="width: 50px"><template #body="{ data }">{{ position(w, data) }}</template></Column>
-        <Column field="token_no" header="Token" style="width: 70px" />
+        <Column header="Token" style="width: 80px">
+          <template #body="{ data }">
+            {{ data.token_no }}
+            <div v-if="data.previous_tokens?.length" class="muted small"
+                 v-tooltip.top="'Not arrived earlier: new token. Reprint if the old one was printed.'">
+              was {{ data.previous_tokens.join(', ') }}</div>
+          </template>
+        </Column>
         <Column v-for="col in answerColumns(w)" :key="col.field_id" :header="col.label">
           <template #body="{ data }">{{ answer(data, col) }}</template>
         </Column>
@@ -57,7 +64,7 @@
         </Column>
         <Column header="Amount" style="width: 140px">
           <template #body="{ data }">
-            <span :class="{ due: needsPayment(data) }">{{ data.status === 'cancelled' && data.paid ? 'Paid – cancelled' : amountLabel(data) }}</span>
+            <span :class="{ due: needsPayment(data) }">{{ data.status === 'cancelled' && data.paid ? cancelledLabel(data) : amountLabel(data) }}</span>
           </template>
         </Column>
         <Column header="Booked by" style="width: 150px"><template #body="{ data }">{{ data.booked_by_text }}</template></Column>
@@ -79,7 +86,7 @@
               <Button v-else-if="canDo('payment') && canDo('change_amount') && data.paid" icon="pi pi-pencil" text rounded
                       aria-label="Change amount" v-tooltip.top="'Change amount'" @click="paying = data" />
               <template v-if="canDo('queue')">
-                <Button v-for="a in visitActions(data)" :key="a.status" :icon="a.icon" text rounded :severity="a.severity"
+                <Button v-for="a in visitActions(data, w)" :key="a.status" :icon="a.icon" text rounded :severity="a.severity"
                         :aria-label="a.label" v-tooltip.top="a.label" @click="setVisit(data, a.status)" />
               </template>
               <Button v-if="printChoices(data).length" icon="pi pi-print" text rounded aria-label="Print"
@@ -97,6 +104,35 @@
     </section>
 
     <Menu ref="printMenu" :model="menuItems" popup />
+
+    <Dialog :visible="!!refunding" modal :header="refunding ? `Cancel token ${refunding.booking.token_no}?` : ''"
+            :style="{ width: '420px' }" @update:visible="refunding = null">
+      <template v-if="refunding">
+        <p class="muted">This booking was paid (₹{{ refunding.booking.bill?.total }}). The place becomes free; token
+          numbers are not reused.</p>
+        <div class="field">
+          <label>Refunded?</label>
+          <SelectButton v-model="refunding.refunded" :options="[{ v: true, l: 'Yes' }, { v: false, l: 'No' }]"
+                        optionLabel="l" optionValue="v" :allowEmpty="false" aria-label="Refunded" />
+        </div>
+        <template v-if="refunding.refunded">
+          <div class="field">
+            <label for="refund-amount">Amount refunded</label>
+            <InputNumber v-model="refunding.amount" inputId="refund-amount" :min="0" :max="Number(refunding.booking.bill?.total || 0)"
+                         :minFractionDigits="0" :maxFractionDigits="2" fluid />
+          </div>
+          <div class="field">
+            <label for="refund-mode">Mode</label>
+            <Select v-model="refunding.mode" inputId="refund-mode" ariaLabel="Mode" :options="MODES" optionLabel="label" optionValue="value" fluid />
+          </div>
+        </template>
+        <Message v-if="refunding.error" severity="error" size="small">{{ refunding.error }}</Message>
+      </template>
+      <template #footer>
+        <Button label="Keep" severity="secondary" text @click="refunding = null" />
+        <Button label="Cancel booking" severity="danger" :loading="refunding?.saving" @click="cancelPaid" />
+      </template>
+    </Dialog>
 
     <EntryDialog v-model:visible="entryOpen" :tenantCode="tenantCode" @saved="entered" />
     <PaymentDialog v-if="setup" :tenantCode="tenantCode" :slug="setup.slug" :booking="paying"
@@ -128,12 +164,14 @@ const canDo = (action) => can(t, 'bookings', action)
 const VISIT = {
   waiting: { label: 'waiting', severity: 'info' },
   arrived: { label: 'arrived', severity: 'success' },
-  not_attended: { label: 'not attended', severity: 'warn' },
-  done: { label: 'done', severity: 'secondary' }
+  not_attended: { label: 'not arrived', severity: 'warn' },
+  done: { label: 'completed', severity: 'secondary' }
 }
 const SOURCES = [{ value: 'all', label: 'All' }, { value: 'link', label: 'Online' }, { value: 'qr', label: 'QR' },
   { value: 'staff', label: 'At clinic' }]
 const PRINTS = { receipt: 'Receipt', op: 'OP sheet' }
+const MODES = [{ value: 'cash', label: 'Cash' }, { value: 'upi', label: 'UPI' }, { value: 'card', label: 'Card' },
+  { value: 'other', label: 'Other' }]
 
 const notify = useNotify()
 const confirm = useConfirm()
@@ -203,13 +241,14 @@ function paid(booking) {
 }
 
 // ---------- queue ----------
-function visitActions(b) {
+// Arrived is marked by the payment (or by printing a free visit). A role that cannot print may still
+// complete a free visit, so nobody is stuck.
+function visitActions(b, w) {
   const s = b.visit_status
+  const freeNoPrint = s !== 'done' && !needsPayment(b) && !printChoices(b).length
   return [
-    s !== 'arrived' && s !== 'done' && { status: 'arrived', label: 'Arrived', icon: 'pi pi-user-plus', severity: 'success' },
-    (s === 'waiting' || s === 'arrived') && { status: 'not_attended', label: 'Not attended (to the end)', icon: 'pi pi-user-minus', severity: 'warn' },
-    s === 'arrived' && { status: 'done', label: 'Done', icon: 'pi pi-check', severity: 'secondary' },
-    s === 'done' && { status: 'arrived', label: 'Back to arrived', icon: 'pi pi-undo', severity: 'secondary' }
+    (s === 'arrived' || freeNoPrint) && { status: 'done', label: 'Appointment completed', icon: 'pi pi-check-circle', severity: 'success' },
+    s !== 'done' && !w?.closed && { status: 'not_attended', label: 'Not arrived (new token, to the bottom)', icon: 'pi pi-user-minus', severity: 'warn' }
   ].filter(Boolean)
 }
 
@@ -250,7 +289,17 @@ async function reopen(w) {
   }
 }
 
+const cancelledLabel = (b) => (!b.refund ? 'Paid – cancelled'
+  : b.refund.refunded ? `Cancelled – refunded ₹${b.refund.amount} (${b.refund.mode.toUpperCase()})` : 'Cancelled – not refunded')
+
+const refunding = ref(null)   // {booking, refunded, amount, mode, saving, error}
 function cancel(booking) {
+  if (booking.paid) {
+    const total = Number(booking.bill?.total || 0)
+    refunding.value = { booking, refunded: total > 0, amount: total,
+      mode: booking.bill?.mode || 'cash', saving: false, error: '' }
+    return
+  }
   confirm.require({
     header: `Cancel token ${booking.token_no}?`,
     message: 'The place becomes free for someone else. Token numbers are not reused.',
@@ -267,6 +316,22 @@ function cancel(booking) {
       }
     }
   })
+}
+
+async function cancelPaid() {
+  const r = refunding.value
+  Object.assign(r, { saving: true, error: '' })
+  try {
+    await schedulesApi.cancelBooking(t, setup.value.slug, r.booking.id,
+      r.refunded ? { refunded: true, amount: r.amount, mode: r.mode } : { refunded: false })
+    refunding.value = null
+    notify.success('Booking cancelled')
+    load()
+  } catch (e) {
+    r.error = e.message
+  } finally {
+    r.saving = false
+  }
 }
 
 // ---------- printing ----------

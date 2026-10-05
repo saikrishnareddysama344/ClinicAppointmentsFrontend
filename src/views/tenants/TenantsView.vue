@@ -67,12 +67,6 @@
           <small class="hint">At least 10 characters. They must change it at first login.</small>
           <small v-if="errors['admin.password']" class="error">{{ errors['admin.password'] }}</small>
         </div>
-        <div class="check">
-          <Checkbox v-model="draft.starter" binary inputId="tenant-starter" />
-          <label for="tenant-starter">Start with the standard setup</label>
-        </div>
-        <small class="hint">Doctors and Branches lists, the booking setup, a "Basic Appointment Details" form and a
-          Reception role - all editable. The admin then adds doctors, branches and timings.</small>
       </form>
       <template #footer>
         <Button label="Cancel" severity="secondary" text @click="showCreate = false" />
@@ -101,7 +95,7 @@ const showCreate = ref(false)
 const saving = ref(false)
 const codeEdited = ref(false)
 const EMPTY_ERRORS = { name: '', code: '', 'admin.name': '', 'admin.email': '', 'admin.password': '' }
-const draft = reactive({ name: '', code: '', starter: true, admin: { name: '', email: '', password: '' } })
+const draft = reactive({ name: '', code: '', admin: { name: '', email: '', password: '' } })
 const errors = reactive({ ...EMPTY_ERRORS })
 
 function syncCode() {
@@ -120,7 +114,7 @@ async function load() {
 }
 
 function openCreate() {
-  Object.assign(draft, { name: '', code: '', starter: true, admin: { name: '', email: '', password: '' } })
+  Object.assign(draft, { name: '', code: '', admin: { name: '', email: '', password: '' } })
   Object.assign(errors, EMPTY_ERRORS)
   codeEdited.value = false
   showCreate.value = true
@@ -130,13 +124,9 @@ async function createTenant() {
   Object.assign(errors, EMPTY_ERRORS)
   saving.value = true
   try {
-    const { tenant, starter } = await tenantsApi.create({ name: draft.name, code: draft.code, starter: draft.starter,
-      admin: { ...draft.admin } })
+    const { tenant } = await tenantsApi.create({ name: draft.name, code: draft.code, admin: { ...draft.admin } })
     showCreate.value = false
     notify.success('Tenant created', `Schema ${tenant.schema_name} is ready.`)
-    if (starter && !starter.done) {
-      notify.warn('The standard setup stopped partway', `At "${starter.stopped_at}": ${starter.message}. Finish it by hand.`)
-    }
     router.push({ name: ROUTES.FORMS, params: { tenantCode: tenant.code } })
   } catch (e) {
     if (e.data?.errors) Object.assign(errors, e.data.errors)
@@ -152,11 +142,3 @@ function openTenant(tenant) {
 
 onMounted(load)
 </script>
-
-<style scoped>
-.check {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-</style>
